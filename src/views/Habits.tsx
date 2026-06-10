@@ -12,6 +12,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
+import CycleChip from '../components/CycleChip';
 import type { Habit } from '../types';
 import { doneThisWeek, lastNDays, streak, todayStr, uid } from '../utils';
 import type { UndoToast } from '../App';
@@ -19,7 +20,8 @@ import type { UndoToast } from '../App';
 interface Props {
   habits: Habit[];
   setHabits: React.Dispatch<React.SetStateAction<Habit[]>>;
-  showUndo: (message: string, undo: UndoToast['undo']) => void;
+  showUndo: (message: string, undo: NonNullable<UndoToast['undo']>) => void;
+  showToast: (message: string) => void;
 }
 
 const ICONS = {
@@ -34,72 +36,17 @@ const ICONS = {
 } as const;
 
 type IconKey = keyof typeof ICONS;
+const ICON_KEYS = Object.keys(ICONS) as IconKey[];
+const TARGETS = ['7', '6', '5', '4', '3', '2', '1'] as const;
+const MILESTONES = new Set([3, 7, 14, 30, 60, 100, 365]);
 
-function HabitIcon({ name }: { name: string }) {
+function HabitIcon({ name, size = 16 }: { name: string; size?: number }) {
   const Icon = ICONS[name as IconKey] ?? Flame;
-  return <Icon size={16} strokeWidth={1.5} />;
+  return <Icon size={size} strokeWidth={1.5} />;
 }
 
-interface HabitFormState {
-  name: string;
-  icon: IconKey;
-  target: number;
-}
-
-function HabitForm({
-  initial,
-  submitLabel,
-  onSubmit,
-}: {
-  initial: HabitFormState;
-  submitLabel: string;
-  onSubmit: (state: HabitFormState) => void;
-}) {
-  const [state, setState] = useState(initial);
-  return (
-    <form
-      className="inline-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!state.name.trim()) return;
-        onSubmit({ ...state, name: state.name.trim() });
-        setState(initial);
-      }}
-    >
-      <div className="icon-picker">
-        {(Object.keys(ICONS) as IconKey[]).map((key) => (
-          <button
-            type="button"
-            key={key}
-            className={`icon-choice ${state.icon === key ? 'active' : ''}`}
-            title={key}
-            onClick={() => setState({ ...state, icon: key })}
-          >
-            <HabitIcon name={key} />
-          </button>
-        ))}
-      </div>
-      <input
-        value={state.name}
-        onChange={(e) => setState({ ...state, name: e.target.value })}
-        placeholder="New habit (e.g. Drink water)"
-      />
-      <select
-        value={state.target}
-        onChange={(e) => setState({ ...state, target: Number(e.target.value) })}
-      >
-        <option value={7}>Every day</option>
-        {[6, 5, 4, 3, 2, 1].map((n) => (
-          <option key={n} value={n}>
-            {n}× a week
-          </option>
-        ))}
-      </select>
-      <button type="submit" className="primary">
-        {submitLabel}
-      </button>
-    </form>
-  );
+function targetLabel(t: string): string {
+  return t === '7' ? 'Every day' : `${t}× a week`;
 }
 
 /** 12-week activity heatmap, columns = weeks, rows = days. */
@@ -115,24 +62,84 @@ function Heatmap({ doneDates }: { doneDates: string[] }) {
   );
 }
 
-export default function Habits({ habits, setHabits, showUndo }: Props) {
+function SmartAddHabit({ onAdd }: { onAdd: (h: Omit<Habit, 'id' | 'doneDates'>) => void }) {
+  const [name, setName] = useState('');
+  const [icon, setIcon] = useState<IconKey>('exercise');
+  const [target, setTarget] = useState<(typeof TARGETS)[number]>('7');
+
+  return (
+    <form
+      className="smart-add card"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onAdd({ name: name.trim(), icon, target: Number(target) });
+        setName('');
+      }}
+    >
+      <div className="row">
+        <input
+          className="grow"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="New habit…"
+          aria-label="New habit"
+        />
+        <button type="submit" className="primary">
+          Add
+        </button>
+      </div>
+      <div className="chip-row">
+        <CycleChip
+          value={icon}
+          options={ICON_KEYS}
+          format={(k) => k}
+          label="Icon"
+          onChange={setIcon}
+        />
+        <span className="chip-preview">
+          <HabitIcon name={icon} size={14} />
+        </span>
+        <CycleChip
+          value={target}
+          options={TARGETS}
+          format={targetLabel}
+          label="Weekly target"
+          active={target !== '7'}
+          onChange={setTarget}
+        />
+      </div>
+      <p className="hint muted small">Tap the chips to change icon and how often.</p>
+    </form>
+  );
+}
+
+export default function Habits({ habits, setHabits, showUndo, showToast }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [justChecked, setJustChecked] = useState<string | null>(null);
   const today = todayStr();
   const week = lastNDays(7);
 
-  function toggle(id: string, date: string) {
-    setHabits((prev) =>
-      prev.map((h) =>
-        h.id === id
-          ? {
-              ...h,
-              doneDates: h.doneDates.includes(date)
-                ? h.doneDates.filter((d) => d !== date)
-                : [...h.doneDates, date],
-            }
-          : h,
-      ),
-    );
+  function toggle(habit: Habit, date: string) {
+    const turningOn = !habit.doneDates.includes(date);
+    const newDates = turningOn
+      ? [...habit.doneDates, date]
+      : habit.doneDates.filter((d) => d !== date);
+    setHabits((prev) => prev.map((h) => (h.id === habit.id ? { ...h, doneDates: newDates } : h)));
+
+    if (turningOn && date === today) {
+      setJustChecked(habit.id);
+      setTimeout(() => setJustChecked(null), 600);
+      const s = streak(newDates);
+      if (MILESTONES.has(s)) {
+        showToast(`${habit.name}: ${s}-day streak — keep it alive`);
+      } else {
+        const othersDone = habits
+          .filter((h) => h.id !== habit.id)
+          .every((h) => h.doneDates.includes(today));
+        if (othersDone && habits.length > 1) showToast('All habits done today. Well done.');
+      }
+    }
   }
 
   function remove(habit: Habit) {
@@ -146,37 +153,25 @@ export default function Habits({ habits, setHabits, showUndo }: Props) {
         <h1>Habits</h1>
       </header>
 
-      <div className="card">
-        <HabitForm
-          initial={{ name: '', icon: 'exercise', target: 7 }}
-          submitLabel="Add"
-          onSubmit={(s) =>
-            setHabits((prev) => [
-              ...prev,
-              { id: uid(), name: s.name, icon: s.icon, doneDates: [], target: s.target },
-            ])
-          }
-        />
-      </div>
+      <SmartAddHabit
+        onAdd={(h) => setHabits((prev) => [...prev, { ...h, id: uid(), doneDates: [] }])}
+      />
 
-      {habits.length === 0 && <p className="muted">Add a habit to start tracking.</p>}
+      {habits.length === 0 && (
+        <p className="muted empty-note">
+          Habits build with small daily check-offs — add your first one above.
+        </p>
+      )}
       <ul className="plain-list">
         {habits.map((h) => {
           if (editingId === h.id) {
             return (
               <li key={h.id} className="card">
-                <HabitForm
-                  initial={{
-                    name: h.name,
-                    icon: (h.icon in ICONS ? h.icon : 'exercise') as IconKey,
-                    target: h.target ?? 7,
-                  }}
-                  submitLabel="Save"
-                  onSubmit={(s) => {
+                <EditHabitForm
+                  habit={h}
+                  onSave={(patch) => {
                     setHabits((prev) =>
-                      prev.map((x) =>
-                        x.id === h.id ? { ...x, name: s.name, icon: s.icon, target: s.target } : x,
-                      ),
+                      prev.map((x) => (x.id === h.id ? { ...x, ...patch } : x)),
                     );
                     setEditingId(null);
                   }}
@@ -188,14 +183,14 @@ export default function Habits({ habits, setHabits, showUndo }: Props) {
           const target = h.target ?? 7;
           const thisWeek = doneThisWeek(h.doneDates);
           return (
-            <li key={h.id} className="card habit">
+            <li key={h.id} className={`card habit list-enter ${justChecked === h.id ? 'pulse' : ''}`}>
               <div className="row">
                 <span className="grow row">
                   <HabitIcon name={h.icon} />
                   <strong>{h.name}</strong>
                   {s > 0 && (
-                    <span className="badge streak">
-                      {s} day{s > 1 ? 's' : ''}
+                    <span className={`badge streak ${MILESTONES.has(s) ? 'milestone' : ''}`}>
+                      <Flame size={11} strokeWidth={1.5} /> {s} day{s > 1 ? 's' : ''}
                     </span>
                   )}
                   <span className={`badge ${thisWeek >= target ? 'streak' : ''}`}>
@@ -207,10 +202,10 @@ export default function Habits({ habits, setHabits, showUndo }: Props) {
                   aria-label="Edit habit"
                   onClick={() => setEditingId(h.id)}
                 >
-                  <Pencil size={14} strokeWidth={1.5} />
+                  <Pencil size={15} strokeWidth={1.5} />
                 </button>
                 <button className="icon-btn" aria-label="Delete habit" onClick={() => remove(h)}>
-                  <X size={15} strokeWidth={1.5} />
+                  <X size={16} strokeWidth={1.5} />
                 </button>
               </div>
               <div className="week-row">
@@ -219,7 +214,8 @@ export default function Habits({ habits, setHabits, showUndo }: Props) {
                     key={d}
                     className={`day-pip ${h.doneDates.includes(d) ? 'on' : ''} ${d === today ? 'today' : ''}`}
                     title={d}
-                    onClick={() => toggle(h.id, d)}
+                    aria-label={`${h.name} on ${d}`}
+                    onClick={() => toggle(h, d)}
                   >
                     {new Date(d + 'T00:00').toLocaleDateString(undefined, { weekday: 'narrow' })}
                   </button>
@@ -231,5 +227,51 @@ export default function Habits({ habits, setHabits, showUndo }: Props) {
         })}
       </ul>
     </div>
+  );
+}
+
+function EditHabitForm({
+  habit,
+  onSave,
+}: {
+  habit: Habit;
+  onSave: (patch: Partial<Habit>) => void;
+}) {
+  const [name, setName] = useState(habit.name);
+  const [icon, setIcon] = useState<IconKey>(
+    (habit.icon in ICONS ? habit.icon : 'exercise') as IconKey,
+  );
+  const [target, setTarget] = useState<(typeof TARGETS)[number]>(
+    String(habit.target ?? 7) as (typeof TARGETS)[number],
+  );
+  return (
+    <form
+      className="smart-add"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onSave({ name: name.trim(), icon, target: Number(target) });
+      }}
+    >
+      <div className="row">
+        <input className="grow" value={name} onChange={(e) => setName(e.target.value)} />
+        <button type="submit" className="primary">
+          Save
+        </button>
+      </div>
+      <div className="chip-row">
+        <CycleChip value={icon} options={ICON_KEYS} format={(k) => k} label="Icon" onChange={setIcon} />
+        <span className="chip-preview">
+          <HabitIcon name={icon} size={14} />
+        </span>
+        <CycleChip
+          value={target}
+          options={TARGETS}
+          format={targetLabel}
+          label="Weekly target"
+          onChange={setTarget}
+        />
+      </div>
+    </form>
   );
 }

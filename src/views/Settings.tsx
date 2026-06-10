@@ -81,6 +81,21 @@ export default function SettingsView({ settings, setSettings }: Props) {
       </header>
 
       <section className="card">
+        <h2>Appearance</h2>
+        <div className="filter-row" style={{ marginBottom: 0 }}>
+          {(['system', 'light', 'dark'] as const).map((t) => (
+            <button
+              key={t}
+              className={`chip ${(settings.theme ?? 'system') === t ? 'active' : ''}`}
+              onClick={() => setSettings((s) => ({ ...s, theme: t }))}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="card">
         <h2>Currency</h2>
         <select
           value={settings.currency}
@@ -152,6 +167,19 @@ export default function SettingsView({ settings, setSettings }: Props) {
               ? 'Storage is protected — the browser will not evict your data under storage pressure.'
               : 'Storage protection not granted yet — it is usually granted automatically once the app is installed to your home screen. Export backups regularly.'}
         </p>
+      </section>
+
+      <section className="card">
+        <h2>Keyboard shortcuts</h2>
+        <div className="shortcut-grid small">
+          <span><kbd>n</kbd></span> <span className="muted">Quick add anything</span>
+          <span><kbd>/</kbd></span> <span className="muted">Search</span>
+          <span><kbd>g</kbd> then <kbd>d</kbd>/<kbd>c</kbd>/<kbd>t</kbd>/<kbd>h</kbd></span>
+          <span className="muted">Go to Today / Calendar / Tasks / Habits</span>
+          <span><kbd>g</kbd> then <kbd>n</kbd>/<kbd>r</kbd>/<kbd>b</kbd>/<kbd>w</kbd>/<kbd>s</kbd></span>
+          <span className="muted">Notes / Reminders / Budget / Review / Settings</span>
+          <span><kbd>Esc</kbd></span> <span className="muted">Close dialogs</span>
+        </div>
       </section>
 
       <section className="card">

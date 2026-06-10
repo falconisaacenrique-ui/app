@@ -58,6 +58,7 @@ export interface Expense {
 
 export interface Settings {
   currency: string; // ISO 4217 code, e.g. "USD"
+  theme?: 'system' | 'light' | 'dark';
 }
 
 export type View =

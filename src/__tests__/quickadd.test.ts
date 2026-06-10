@@ -61,3 +61,18 @@ describe('parseQuickAdd', () => {
     expect(p.date).toBe('2026-06-17');
   });
 });
+
+describe('parseExpense', () => {
+  it('splits trailing amounts off the description', async () => {
+    const { parseExpense } = await import('../quickadd');
+    expect(parseExpense('Coffee 4.50')).toEqual({ description: 'Coffee', amount: 4.5 });
+    expect(parseExpense('Bus ticket $2')).toEqual({ description: 'Bus ticket', amount: 2 });
+    expect(parseExpense('Lunch 12,99')).toEqual({ description: 'Lunch', amount: 12.99 });
+  });
+
+  it('returns null amount when there is none', async () => {
+    const { parseExpense } = await import('../quickadd');
+    expect(parseExpense('Groceries')).toEqual({ description: 'Groceries', amount: null });
+    expect(parseExpense('42')).toEqual({ description: '42', amount: null });
+  });
+});

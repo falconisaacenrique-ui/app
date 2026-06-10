@@ -4,8 +4,12 @@ import {
   CheckSquare,
   ClipboardList,
   Flame,
+  Plus,
   Wallet,
+  X,
 } from 'lucide-react';
+import Check from '../components/Check';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import { occursOn } from '../recurrence';
 import type { CalendarEvent, Expense, Habit, Reminder, Task, View } from '../types';
 import { formatMoney, formatTime, todayStr } from '../utils';
@@ -20,6 +24,7 @@ interface Props {
   budget: number;
   currency: string;
   onNavigate: (view: View) => void;
+  onQuickAdd: () => void;
 }
 
 interface TimelineItem {
@@ -27,7 +32,7 @@ interface TimelineItem {
   kind: 'event' | 'task' | 'reminder';
   time?: string; // HH:MM, undefined = all-day
   label: string;
-  sublabel?: string;
+  overdue?: boolean;
 }
 
 function greeting(): string {
@@ -48,8 +53,17 @@ export default function Dashboard({
   budget,
   currency,
   onNavigate,
+  onQuickAdd,
 }: Props) {
   const today = todayStr();
+  const [welcomed, setWelcomed] = useLocalStorage<boolean>('lifehub.welcomed', false);
+
+  const hasAnyData =
+    events.length > 0 ||
+    tasks.length > 0 ||
+    reminders.length > 0 ||
+    habits.length > 0 ||
+    expenses.length > 0;
 
   const timeline: TimelineItem[] = [
     ...events
@@ -75,12 +89,14 @@ export default function Dashboard({
         kind: 'task' as const,
         time: undefined,
         label: t.text,
-        sublabel: t.due! < today ? 'overdue' : undefined,
+        overdue: t.due! < today,
       })),
   ].sort((a, b) => (a.time ?? '00:00').localeCompare(b.time ?? '00:00'));
 
   const openTasks = tasks.filter((t) => !t.done);
+  const dueToday = openTasks.filter((t) => t.due && t.due <= today).length;
   const habitsDone = habits.filter((h) => h.doneDates.includes(today)).length;
+  const habitsLeft = habits.length - habitsDone;
   const month = today.slice(0, 7);
   const spent = expenses
     .filter((e) => e.date.startsWith(month))
@@ -92,6 +108,20 @@ export default function Dashboard({
     reminder: 'reminders',
     task: 'tasks',
   };
+
+  const taskSummary =
+    openTasks.length === 0
+      ? 'All caught up — nice.'
+      : dueToday > 0
+        ? `${dueToday} due today of ${openTasks.length} open`
+        : `${openTasks.length} open, nothing pressing today`;
+
+  const habitSummary =
+    habits.length === 0
+      ? null
+      : habitsLeft === 0
+        ? 'All done today. Well done.'
+        : `${habitsDone} of ${habits.length} done — ${habitsLeft} to go`;
 
   return (
     <div className="view">
@@ -106,27 +136,60 @@ export default function Dashboard({
         </p>
       </header>
 
+      {!welcomed && !hasAnyData && (
+        <section className="card welcome">
+          <div className="row">
+            <h2 className="grow">Welcome to LifeHub</h2>
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => setWelcomed(true)}>
+              <X size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+          <p className="muted small">
+            Your calendar, tasks, notes, reminders, habits, and budget — all in one private
+            place. Everything stays on your device. Start with one of these:
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button className="primary row" onClick={onQuickAdd}>
+              <Plus size={15} strokeWidth={1.5} /> Add anything
+            </button>
+            <button className="chip" onClick={() => onNavigate('habits')}>
+              Track a habit
+            </button>
+            <button className="chip" onClick={() => onNavigate('calendar')}>
+              Plan your week
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="card timeline">
         <h2>
           <CalendarIcon size={15} strokeWidth={1.5} /> Your day
         </h2>
         {timeline.length === 0 ? (
-          <p className="muted">Nothing scheduled — enjoy the open day.</p>
+          <p className="muted">
+            Nothing scheduled —{' '}
+            <button className="link accent" onClick={onQuickAdd}>
+              add something
+            </button>{' '}
+            or enjoy the open day.
+          </p>
         ) : (
           <ul className="plain-list">
             {timeline.map((item) => {
               const Icon = KIND_ICON[item.kind];
               return (
-                <li key={item.id} className="row timeline-item">
+                <li key={item.id} className="row timeline-item list-enter">
                   <span className="timeline-time muted">
                     {item.time ? formatTime(item.time) : '—'}
                   </span>
                   <Icon size={14} strokeWidth={1.5} className="muted" />
                   {item.kind === 'task' ? (
-                    <label className="row grow">
-                      <input
-                        type="checkbox"
-                        onChange={() =>
+                    <span className="row grow">
+                      <Check
+                        checked={false}
+                        label={`Complete ${item.label}`}
+                        onToggle={() =>
                           setTasks((prev) =>
                             prev.map((t) =>
                               `t-${t.id}` === item.id
@@ -138,9 +201,9 @@ export default function Dashboard({
                       />
                       <span className="grow">
                         {item.label}
-                        {item.sublabel && <span className="badge overdue">{item.sublabel}</span>}
+                        {item.overdue && <span className="badge overdue">overdue</span>}
                       </span>
-                    </label>
+                    </span>
                   ) : (
                     <button className="link grow" onClick={() => onNavigate(KIND_VIEW[item.kind])}>
                       {item.label}
@@ -158,27 +221,20 @@ export default function Dashboard({
           <h2>
             <CheckSquare size={15} strokeWidth={1.5} /> Tasks
           </h2>
-          <p className="muted">
-            {openTasks.length === 0
-              ? 'All caught up.'
-              : `${openTasks.length} open task${openTasks.length > 1 ? 's' : ''}`}
-          </p>
+          <p className={openTasks.length === 0 ? 'muted' : ''}>{taskSummary}</p>
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('habits')}>
           <h2>
             <Flame size={15} strokeWidth={1.5} /> Habits
           </h2>
-          {habits.length === 0 ? (
-            <p className="muted">No habits tracked yet.</p>
+          {habitSummary === null ? (
+            <p className="cta-text">
+              <Plus size={14} strokeWidth={1.5} /> Add your first habit
+            </p>
           ) : (
             <>
-              <p>
-                <strong>
-                  {habitsDone}/{habits.length}
-                </strong>{' '}
-                done today
-              </p>
+              <p>{habitSummary}</p>
               <div className="progress">
                 <div
                   className="progress-bar"
@@ -189,30 +245,40 @@ export default function Dashboard({
           )}
         </section>
 
-        <section className="card clickable" onClick={() => onNavigate('review')}>
-          <h2>
-            <ClipboardList size={15} strokeWidth={1.5} /> Weekly review
-          </h2>
-          <p className="muted">How the week went, and what's ahead.</p>
-        </section>
-
         <section className="card clickable" onClick={() => onNavigate('budget')}>
           <h2>
             <Wallet size={15} strokeWidth={1.5} /> This month
           </h2>
-          <p>
-            Spent <strong>{formatMoney(spent, currency)}</strong>
-            {budget > 0 && <> of {formatMoney(budget, currency)} budget</>}
-          </p>
-          {budget > 0 && (
-            <div className="progress">
-              <div
-                className={`progress-bar ${spent > budget ? 'over' : ''}`}
-                style={{ width: `${Math.min(100, (spent / budget) * 100)}%` }}
-              />
-            </div>
+          {expenses.length === 0 && budget === 0 ? (
+            <p className="cta-text">
+              <Plus size={14} strokeWidth={1.5} /> Track your spending
+            </p>
+          ) : (
+            <>
+              <p>
+                Spent <strong>{formatMoney(spent, currency)}</strong>
+                {budget > 0 && <> of {formatMoney(budget, currency)}</>}
+              </p>
+              {budget > 0 && (
+                <div className="progress">
+                  <div
+                    className={`progress-bar ${spent > budget ? 'over' : ''}`}
+                    style={{ width: `${Math.min(100, (spent / budget) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </>
           )}
         </section>
+
+        {hasAnyData && (
+          <section className="card clickable" onClick={() => onNavigate('review')}>
+            <h2>
+              <ClipboardList size={15} strokeWidth={1.5} /> Weekly review
+            </h2>
+            <p className="muted">How the week went, and what's ahead.</p>
+          </section>
+        )}
       </div>
     </div>
   );

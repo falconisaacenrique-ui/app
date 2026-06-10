@@ -3,13 +3,16 @@ import {
   Bell,
   Calendar as CalendarIcon,
   CheckSquare,
+  ClipboardList,
   Flame,
   LayoutDashboard,
+  MoreHorizontal,
   Plus,
   Search as SearchIcon,
   Settings as SettingsIcon,
   StickyNote,
   Wallet,
+  X,
 } from 'lucide-react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { nextDatetime } from './recurrence';
@@ -36,19 +39,41 @@ import SearchView from './views/Search';
 import SettingsView from './views/Settings';
 import Review from './views/Review';
 
-const NAV: { view: View; label: string; icon: typeof Bell }[] = [
+interface NavItem {
+  view: View;
+  label: string;
+  icon: typeof Bell;
+}
+
+const PRIMARY_NAV: NavItem[] = [
   { view: 'dashboard', label: 'Today', icon: LayoutDashboard },
   { view: 'calendar', label: 'Calendar', icon: CalendarIcon },
   { view: 'tasks', label: 'Tasks', icon: CheckSquare },
+  { view: 'habits', label: 'Habits', icon: Flame },
+];
+
+const MORE_NAV: NavItem[] = [
   { view: 'notes', label: 'Notes', icon: StickyNote },
   { view: 'reminders', label: 'Reminders', icon: Bell },
-  { view: 'habits', label: 'Habits', icon: Flame },
   { view: 'budget', label: 'Budget', icon: Wallet },
+  { view: 'review', label: 'Weekly review', icon: ClipboardList },
   { view: 'search', label: 'Search', icon: SearchIcon },
   { view: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const VIEWS = new Set<string>([...NAV.map((n) => n.view), 'review']);
+const VIEWS = new Set<string>([...PRIMARY_NAV, ...MORE_NAV].map((n) => n.view));
+
+const SHORTCUT_VIEWS: Record<string, View> = {
+  d: 'dashboard',
+  c: 'calendar',
+  t: 'tasks',
+  h: 'habits',
+  n: 'notes',
+  r: 'reminders',
+  b: 'budget',
+  w: 'review',
+  s: 'settings',
+};
 
 function viewFromHash(): View {
   const v = window.location.hash.replace(/^#\/?/, '');
@@ -76,7 +101,7 @@ async function notify(body: string) {
 
 export interface UndoToast {
   message: string;
-  undo: () => void;
+  undo?: () => void;
 }
 
 export default function App() {
@@ -94,24 +119,89 @@ export default function App() {
   const [toast, setToast] = useState<UndoToast | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddText, setQuickAddText] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingG = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hash-based routing so views are linkable and the back button works.
   useEffect(() => {
-    const onHash = () => setViewState(viewFromHash());
+    const onHash = () => {
+      setViewState(viewFromHash());
+      setQuickAddOpen(false);
+      setMoreOpen(false);
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   const setView = useCallback((v: View) => {
+    setMoreOpen(false);
+    if (viewFromHash() === v) return;
     window.location.hash = `/${v}`;
   }, []);
 
-  const showUndo = useCallback((message: string, undo: () => void) => {
+  // Manual theme override; 'system' (or unset) follows the OS preference.
+  useEffect(() => {
+    const theme = settings.theme ?? 'system';
+    if (theme === 'system') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+  }, [settings.theme]);
+
+  const showToast = useCallback((message: string, undo?: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ message, undo });
-    toastTimer.current = setTimeout(() => setToast(null), 6000);
+    toastTimer.current = setTimeout(() => setToast(null), 5000);
   }, []);
+
+  const showUndo = useCallback(
+    (message: string, undo: () => void) => showToast(message, undo),
+    [showToast],
+  );
+
+  // Global keyboard shortcuts: n = quick add, / = search, g+letter = go to view.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) {
+        if (e.key === 'Escape') (target as HTMLInputElement).blur();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Escape') {
+        setQuickAddOpen(false);
+        setMoreOpen(false);
+        return;
+      }
+      if (pendingG.current) {
+        clearTimeout(pendingG.current);
+        pendingG.current = null;
+        const v = SHORTCUT_VIEWS[e.key];
+        if (v) {
+          e.preventDefault();
+          setView(v);
+        }
+        return;
+      }
+      if (e.key === 'n') {
+        e.preventDefault();
+        setQuickAddOpen(true);
+      } else if (e.key === '/') {
+        e.preventDefault();
+        setView('search');
+      } else if (e.key === 'g') {
+        pendingG.current = setTimeout(() => {
+          pendingG.current = null;
+        }, 1200);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setView]);
 
   // Reminder engine: fire due notifications (side effects outside the state
   // updater), then mark notified or advance repeating reminders.
@@ -155,6 +245,7 @@ export default function App() {
         },
       ]);
       setView('reminders');
+      showToast(`Reminder set: ${parsed.text}`);
     } else if (parsed.kind === 'event') {
       setEvents((prev) => [
         ...prev,
@@ -167,6 +258,7 @@ export default function App() {
         },
       ]);
       setView('calendar');
+      showToast(`Event added: ${parsed.text}`);
     } else {
       setTasks((prev) => [
         ...prev,
@@ -180,10 +272,25 @@ export default function App() {
         },
       ]);
       setView('tasks');
+      showToast(`Task added: ${parsed.text}`);
     }
     setQuickAddText('');
     setQuickAddOpen(false);
   }
+
+  const navButton = ({ view: v, label, icon: Icon }: NavItem) => (
+    <button
+      key={v}
+      className={`nav-item ${view === v ? 'active' : ''}`}
+      aria-current={view === v ? 'page' : undefined}
+      onClick={() => setView(v)}
+    >
+      <Icon className="nav-icon" size={18} strokeWidth={1.5} />
+      <span className="nav-label">{label}</span>
+    </button>
+  );
+
+  const moreActive = MORE_NAV.some((n) => n.view === view);
 
   return (
     <div className="app">
@@ -192,18 +299,36 @@ export default function App() {
           <span className="brand-mark" />
           <span className="brand-name">LifeHub</span>
         </div>
-        {NAV.map(({ view: v, label, icon: Icon }) => (
-          <button
-            key={v}
-            className={`nav-item ${view === v ? 'active' : ''}`}
-            aria-current={view === v ? 'page' : undefined}
-            onClick={() => setView(v)}
-          >
-            <Icon className="nav-icon" size={18} strokeWidth={1.5} />
-            <span className="nav-label">{label}</span>
-          </button>
-        ))}
+        {PRIMARY_NAV.map(navButton)}
+        <div className="nav-extra">{MORE_NAV.map(navButton)}</div>
+        <button
+          className={`nav-item nav-more ${moreActive ? 'active' : ''}`}
+          aria-label="More"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((o) => !o)}
+        >
+          <MoreHorizontal className="nav-icon" size={18} strokeWidth={1.5} />
+          <span className="nav-label">More</span>
+        </button>
       </nav>
+
+      {moreOpen && (
+        <div className="sheet-backdrop" onClick={() => setMoreOpen(false)}>
+          <div className="sheet" role="menu" onClick={(e) => e.stopPropagation()}>
+            {MORE_NAV.map(({ view: v, label, icon: Icon }) => (
+              <button
+                key={v}
+                role="menuitem"
+                className={`sheet-item ${view === v ? 'active' : ''}`}
+                onClick={() => setView(v)}
+              >
+                <Icon size={18} strokeWidth={1.5} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <main className="main">
         {view === 'dashboard' && (
@@ -217,18 +342,21 @@ export default function App() {
             budget={budget}
             currency={settings.currency}
             onNavigate={setView}
+            onQuickAdd={() => setQuickAddOpen(true)}
           />
         )}
         {view === 'calendar' && (
           <Calendar events={events} setEvents={setEvents} tasks={tasks} showUndo={showUndo} />
         )}
-        {view === 'tasks' && <Tasks tasks={tasks} setTasks={setTasks} showUndo={showUndo} />}
+        {view === 'tasks' && (
+          <Tasks tasks={tasks} setTasks={setTasks} showUndo={showUndo} showToast={showToast} />
+        )}
         {view === 'notes' && <Notes notes={notes} setNotes={setNotes} showUndo={showUndo} />}
         {view === 'reminders' && (
           <Reminders reminders={reminders} setReminders={setReminders} showUndo={showUndo} />
         )}
         {view === 'habits' && (
-          <Habits habits={habits} setHabits={setHabits} showUndo={showUndo} />
+          <Habits habits={habits} setHabits={setHabits} showUndo={showUndo} showToast={showToast} />
         )}
         {view === 'budget' && (
           <Budget
@@ -251,9 +379,7 @@ export default function App() {
             onNavigate={setView}
           />
         )}
-        {view === 'settings' && (
-          <SettingsView settings={settings} setSettings={setSettings} />
-        )}
+        {view === 'settings' && <SettingsView settings={settings} setSettings={setSettings} />}
         {view === 'review' && (
           <Review
             events={events}
@@ -267,29 +393,33 @@ export default function App() {
         )}
       </main>
 
-      <button
-        className="fab"
-        aria-label="Quick add"
-        onClick={() => setQuickAddOpen(true)}
-      >
+      <button className="fab" aria-label="Quick add (n)" onClick={() => setQuickAddOpen(true)}>
         <Plus size={22} strokeWidth={1.5} />
       </button>
 
       {quickAddOpen && (
         <div className="modal-backdrop" onClick={() => setQuickAddOpen(false)}>
-          <form
-            className="modal"
-            onClick={(e) => e.stopPropagation()}
-            onSubmit={submitQuickAdd}
-          >
-            <input
-              autoFocus
-              value={quickAddText}
-              onChange={(e) => setQuickAddText(e.target.value)}
-              placeholder='Try "dentist tomorrow 3pm" or "remind me to call mom 9am"'
-            />
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submitQuickAdd}>
+            <div className="row">
+              <input
+                autoFocus
+                className="grow"
+                value={quickAddText}
+                onChange={(e) => setQuickAddText(e.target.value)}
+                placeholder="Add anything…"
+              />
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Close"
+                onClick={() => setQuickAddOpen(false)}
+              >
+                <X size={18} strokeWidth={1.5} />
+              </button>
+            </div>
             <p className="muted small">
-              Times become events, "remind…" becomes a reminder, everything else a task.
+              Try <em>dentist tomorrow 3pm</em> · <em>remind me to call mom 9am</em> ·{' '}
+              <em>buy groceries friday</em>
             </p>
             <button type="submit" className="primary">
               Add
@@ -301,14 +431,16 @@ export default function App() {
       {toast && (
         <div className="toast" role="status">
           <span>{toast.message}</span>
-          <button
-            onClick={() => {
-              toast.undo();
-              setToast(null);
-            }}
-          >
-            Undo
-          </button>
+          {toast.undo && (
+            <button
+              onClick={() => {
+                toast.undo!();
+                setToast(null);
+              }}
+            >
+              Undo
+            </button>
+          )}
         </div>
       )}
     </div>

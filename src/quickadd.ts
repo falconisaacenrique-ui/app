@@ -105,3 +105,12 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
   text = text.replace(/\s{2,}/g, ' ').replace(/\s+(at|on)$/i, '').trim();
   return { kind, text, date, time };
 }
+
+/** "Coffee 4.50" -> { description: "Coffee", amount: 4.5 }. */
+export function parseExpense(input: string): { description: string; amount: number | null } {
+  const m = input.match(/(?:^|\s)\$?(\d+(?:[.,]\d{1,2})?)\s*$/);
+  if (!m || m[1] === undefined) return { description: input.trim(), amount: null };
+  const description = input.slice(0, m.index).trim();
+  if (!description) return { description: input.trim(), amount: null };
+  return { description, amount: parseFloat(m[1].replace(',', '.')) };
+}

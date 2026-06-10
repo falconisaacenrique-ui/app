@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Pencil, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, Pencil, X } from 'lucide-react';
+import Check from '../components/Check';
+import CycleChip from '../components/CycleChip';
+import SwipeRow from '../components/SwipeRow';
 import { nextDate, REPEAT_LABELS } from '../recurrence';
+import { parseQuickAdd } from '../quickadd';
 import type { Priority, Repeat, Task } from '../types';
 import { formatDate, todayStr, uid } from '../utils';
 import type { UndoToast } from '../App';
@@ -8,60 +12,133 @@ import type { UndoToast } from '../App';
 interface Props {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  showUndo: (message: string, undo: UndoToast['undo']) => void;
+  showUndo: (message: string, undo: NonNullable<UndoToast['undo']>) => void;
+  showToast: (message: string) => void;
 }
 
 const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+const PRIORITIES = ['medium', 'high', 'low'] as const;
+const REPEATS = ['', 'daily', 'weekly', 'monthly'] as const;
 
-interface TaskFormState {
-  text: string;
-  due: string;
-  priority: Priority;
-  repeat: '' | Repeat;
+function repeatLabel(r: '' | Repeat): string {
+  return REPEAT_LABELS.find((x) => x.value === r)?.label ?? 'Once';
 }
 
-function TaskForm({
-  initial,
-  submitLabel,
-  onSubmit,
+/** Single smart input + chips — type "gym friday" and the date is parsed for you. */
+function SmartAddTask({ onAdd }: { onAdd: (t: Omit<Task, 'id' | 'createdAt'>) => void }) {
+  const [text, setText] = useState('');
+  const [priority, setPriority] = useState<Priority>('medium');
+  const [repeat, setRepeat] = useState<'' | Repeat>('');
+  const [due, setDue] = useState('');
+  const [showDate, setShowDate] = useState(false);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseQuickAdd(text);
+    if (!parsed.text.trim()) return;
+    onAdd({
+      text: parsed.text,
+      done: false,
+      due: due || parsed.date || undefined,
+      priority,
+      repeat: repeat || undefined,
+    });
+    setText('');
+    setDue('');
+    setShowDate(false);
+  }
+
+  return (
+    <form className="smart-add card" onSubmit={submit}>
+      <div className="row">
+        <input
+          className="grow"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Add a task…"
+          aria-label="New task"
+        />
+        <button type="submit" className="primary">
+          Add
+        </button>
+      </div>
+      <div className="chip-row">
+        <button
+          type="button"
+          className={`chip ${due ? 'active' : ''}`}
+          onClick={() => setShowDate((s) => !s)}
+        >
+          <CalendarDays size={13} strokeWidth={1.5} />
+          {due ? formatDate(due) : 'Date'}
+        </button>
+        {showDate && (
+          <input
+            type="date"
+            value={due}
+            autoFocus
+            onChange={(e) => {
+              setDue(e.target.value);
+              setShowDate(false);
+            }}
+          />
+        )}
+        <CycleChip
+          value={priority}
+          options={PRIORITIES}
+          format={(p) => p}
+          label="Priority"
+          active={priority !== 'medium'}
+          onChange={setPriority}
+        />
+        <CycleChip
+          value={repeat}
+          options={REPEATS}
+          format={repeatLabel}
+          label="Repeat"
+          active={repeat !== ''}
+          onChange={setRepeat}
+        />
+      </div>
+      <p className="hint muted small">
+        Tip: type a day right in the text — <em>buy groceries friday</em>
+      </p>
+    </form>
+  );
+}
+
+function EditTaskForm({
+  task,
+  onSave,
 }: {
-  initial: TaskFormState;
-  submitLabel: string;
-  onSubmit: (state: TaskFormState) => void;
+  task: Task;
+  onSave: (patch: Partial<Task>) => void;
 }) {
-  const [state, setState] = useState(initial);
+  const [text, setText] = useState(task.text);
+  const [due, setDue] = useState(task.due ?? '');
+  const [priority, setPriority] = useState<Priority>(task.priority);
+  const [repeat, setRepeat] = useState<'' | Repeat>(task.repeat ?? '');
   return (
     <form
       className="inline-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!state.text.trim()) return;
-        onSubmit({ ...state, text: state.text.trim() });
-        setState(initial);
+        if (!text.trim()) return;
+        onSave({
+          text: text.trim(),
+          due: due || undefined,
+          priority,
+          repeat: repeat || undefined,
+        });
       }}
     >
-      <input
-        value={state.text}
-        onChange={(e) => setState({ ...state, text: e.target.value })}
-        placeholder="What needs doing?"
-      />
-      <input
-        type="date"
-        value={state.due}
-        onChange={(e) => setState({ ...state, due: e.target.value })}
-      />
-      <select
-        value={state.priority}
-        onChange={(e) => setState({ ...state, priority: e.target.value as Priority })}
-      >
+      <input value={text} onChange={(e) => setText(e.target.value)} aria-label="Task text" />
+      <input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+      <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
       </select>
-      <select
-        value={state.repeat}
-        onChange={(e) => setState({ ...state, repeat: e.target.value as '' | Repeat })}
-      >
+      <select value={repeat} onChange={(e) => setRepeat(e.target.value as '' | Repeat)}>
         {REPEAT_LABELS.map((r) => (
           <option key={r.value} value={r.value}>
             {r.label}
@@ -69,18 +146,18 @@ function TaskForm({
         ))}
       </select>
       <button type="submit" className="primary">
-        {submitLabel}
+        Save
       </button>
     </form>
   );
 }
 
-export default function Tasks({ tasks, setTasks, showUndo }: Props) {
-  const [filter, setFilter] = useState<'all' | 'active' | 'done'>('all');
+export default function Tasks({ tasks, setTasks, showUndo, showToast }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
   const today = todayStr();
 
-  function toggle(task: Task) {
+  function complete(task: Task) {
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id !== task.id) return t;
@@ -91,6 +168,9 @@ export default function Tasks({ tasks, setTasks, showUndo }: Props) {
         return { ...t, done: !t.done, doneAt: t.done ? undefined : Date.now() };
       }),
     );
+    if (!task.done && task.repeat && task.due) {
+      showToast(`Rescheduled — repeats ${task.repeat}`);
+    }
   }
 
   function remove(task: Task) {
@@ -98,110 +178,126 @@ export default function Tasks({ tasks, setTasks, showUndo }: Props) {
     showUndo(`Deleted "${task.text}"`, () => setTasks((prev) => [...prev, task]));
   }
 
-  const visible = tasks
-    .filter((t) => (filter === 'all' ? true : filter === 'active' ? !t.done : t.done))
-    .sort((a, b) => {
-      if (a.done !== b.done) return a.done ? 1 : -1;
+  function clearCompleted() {
+    const done = tasks.filter((t) => t.done);
+    if (done.length === 0) return;
+    setTasks((prev) => prev.filter((t) => !t.done));
+    showUndo(`Cleared ${done.length} completed`, () => setTasks((prev) => [...prev, ...done]));
+  }
+
+  const open = tasks.filter((t) => !t.done);
+  const sortOpen = (list: Task[]) =>
+    [...list].sort((a, b) => {
       const dueA = a.due ?? '9999';
       const dueB = b.due ?? '9999';
       if (dueA !== dueB) return dueA.localeCompare(dueB);
       return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     });
 
+  const groups: { label: string; items: Task[]; tone?: 'warn' }[] = [
+    { label: 'Overdue', items: sortOpen(open.filter((t) => t.due && t.due < today)), tone: 'warn' },
+    { label: 'Today', items: sortOpen(open.filter((t) => t.due === today)) },
+    { label: 'Upcoming', items: sortOpen(open.filter((t) => t.due && t.due > today)) },
+    { label: 'Anytime', items: sortOpen(open.filter((t) => !t.due)) },
+  ];
+  const completed = [...tasks.filter((t) => t.done)].sort(
+    (a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0),
+  );
+
+  const renderTask = (t: Task) =>
+    editingId === t.id ? (
+      <li key={t.id} className="card">
+        <EditTaskForm
+          task={t}
+          onSave={(patch) => {
+            setTasks((prev) => prev.map((x) => (x.id === t.id ? { ...x, ...patch } : x)));
+            setEditingId(null);
+          }}
+        />
+      </li>
+    ) : (
+      <li key={t.id} className="list-enter">
+        <SwipeRow onSwipeRight={() => complete(t)} onSwipeLeft={() => remove(t)}>
+          <div className={`card row task ${t.done ? 'done' : ''}`}>
+            <Check checked={t.done} onToggle={() => complete(t)} label={`Complete ${t.text}`} />
+            <span className="grow">
+              {t.text}
+              {t.priority !== 'medium' && (
+                <span className={`badge prio-${t.priority}`}>{t.priority}</span>
+              )}
+              {t.repeat && <span className="badge">{t.repeat}</span>}
+              {t.due && (
+                <span className={`badge ${!t.done && t.due < today ? 'overdue' : ''}`}>
+                  {formatDate(t.due)}
+                </span>
+              )}
+            </span>
+            <button className="icon-btn" aria-label="Edit task" onClick={() => setEditingId(t.id)}>
+              <Pencil size={15} strokeWidth={1.5} />
+            </button>
+            <button className="icon-btn" aria-label="Delete task" onClick={() => remove(t)}>
+              <X size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+        </SwipeRow>
+      </li>
+    );
+
   return (
     <div className="view">
       <header className="view-header">
         <h1>Tasks</h1>
+        {open.length > 0 && (
+          <p className="muted">
+            {open.length} open · swipe right to complete, left to delete
+          </p>
+        )}
       </header>
 
-      <div className="card">
-        <TaskForm
-          initial={{ text: '', due: '', priority: 'medium', repeat: '' }}
-          submitLabel="Add"
-          onSubmit={(s) =>
-            setTasks((prev) => [
-              ...prev,
-              {
-                id: uid(),
-                text: s.text,
-                done: false,
-                due: s.due || undefined,
-                priority: s.priority,
-                repeat: s.repeat || undefined,
-                createdAt: Date.now(),
-              },
-            ])
-          }
-        />
-      </div>
+      <SmartAddTask
+        onAdd={(t) => {
+          setTasks((prev) => [...prev, { ...t, id: uid(), createdAt: Date.now() }]);
+        }}
+      />
 
-      <div className="filter-row">
-        {(['all', 'active', 'done'] as const).map((f) => (
-          <button
-            key={f}
-            className={`chip ${filter === f ? 'active' : ''}`}
-            onClick={() => setFilter(f)}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
+      {open.length === 0 && completed.length === 0 && (
+        <p className="muted empty-note">Nothing here yet — add your first task above.</p>
+      )}
 
-      {visible.length === 0 && <p className="muted">No tasks here.</p>}
-      <ul className="plain-list">
-        {visible.map((t) =>
-          editingId === t.id ? (
-            <li key={t.id} className="card">
-              <TaskForm
-                initial={{
-                  text: t.text,
-                  due: t.due ?? '',
-                  priority: t.priority,
-                  repeat: t.repeat ?? '',
-                }}
-                submitLabel="Save"
-                onSubmit={(s) => {
-                  setTasks((prev) =>
-                    prev.map((x) =>
-                      x.id === t.id
-                        ? {
-                            ...x,
-                            text: s.text,
-                            due: s.due || undefined,
-                            priority: s.priority,
-                            repeat: s.repeat || undefined,
-                          }
-                        : x,
-                    ),
-                  );
-                  setEditingId(null);
-                }}
-              />
-            </li>
-          ) : (
-            <li key={t.id} className={`card row task ${t.done ? 'done' : ''}`}>
-              <input type="checkbox" checked={t.done} onChange={() => toggle(t)} />
-              <span className="grow">
-                {t.text}
-                <span className={`badge prio-${t.priority}`}>{t.priority}</span>
-                {t.repeat && <span className="badge">{t.repeat}</span>}
-                {t.due && (
-                  <span className={`badge ${!t.done && t.due < today ? 'overdue' : ''}`}>
-                    {!t.done && t.due < today ? 'overdue · ' : ''}
-                    {formatDate(t.due)}
-                  </span>
-                )}
-              </span>
-              <button className="icon-btn" aria-label="Edit task" onClick={() => setEditingId(t.id)}>
-                <Pencil size={14} strokeWidth={1.5} />
-              </button>
-              <button className="icon-btn" aria-label="Delete task" onClick={() => remove(t)}>
-                <X size={15} strokeWidth={1.5} />
-              </button>
-            </li>
+      {groups.map(
+        (g) =>
+          g.items.length > 0 && (
+            <section key={g.label} className="task-group">
+              <h3 className={`group-label ${g.tone ?? ''}`}>
+                {g.label} <span className="muted">{g.items.length}</span>
+              </h3>
+              <ul className="plain-list">{g.items.map(renderTask)}</ul>
+            </section>
           ),
-        )}
-      </ul>
+      )}
+
+      {completed.length > 0 && (
+        <section className="task-group">
+          <div className="row">
+            <button
+              className="group-label as-button grow"
+              onClick={() => setShowCompleted((s) => !s)}
+              aria-expanded={showCompleted}
+            >
+              {showCompleted ? (
+                <ChevronDown size={14} strokeWidth={1.5} />
+              ) : (
+                <ChevronRight size={14} strokeWidth={1.5} />
+              )}
+              Completed <span className="muted">{completed.length}</span>
+            </button>
+            <button className="chip" onClick={clearCompleted}>
+              Clear
+            </button>
+          </div>
+          {showCompleted && <ul className="plain-list">{completed.map(renderTask)}</ul>}
+        </section>
+      )}
     </div>
   );
 }

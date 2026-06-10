@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react';
+import CycleChip from '../components/CycleChip';
+import { parseExpense } from '../quickadd';
 import type { Expense } from '../types';
 import { formatDate, formatMoney, todayStr, uid } from '../utils';
 import type { UndoToast } from '../App';
@@ -10,68 +12,80 @@ interface Props {
   budget: number;
   setBudget: React.Dispatch<React.SetStateAction<number>>;
   currency: string;
-  showUndo: (message: string, undo: UndoToast['undo']) => void;
+  showUndo: (message: string, undo: NonNullable<UndoToast['undo']>) => void;
 }
 
-const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Fun', 'Health', 'Other'];
+const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Bills', 'Fun', 'Health', 'Other'] as const;
 
-interface ExpenseFormState {
-  description: string;
-  amount: string;
-  category: string;
-  date: string;
-}
+function SmartAddExpense({ onAdd }: { onAdd: (e: Omit<Expense, 'id'>) => void }) {
+  const [text, setText] = useState('');
+  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('Food');
+  const [date, setDate] = useState(todayStr());
+  const [showDate, setShowDate] = useState(false);
+  const [error, setError] = useState(false);
 
-function ExpenseForm({
-  initial,
-  submitLabel,
-  onSubmit,
-}: {
-  initial: ExpenseFormState;
-  submitLabel: string;
-  onSubmit: (state: ExpenseFormState) => void;
-}) {
-  const [state, setState] = useState(initial);
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseExpense(text);
+    if (!parsed.description || parsed.amount === null || parsed.amount <= 0) {
+      setError(true);
+      return;
+    }
+    setError(false);
+    onAdd({ description: parsed.description, amount: parsed.amount, category, date });
+    setText('');
+  }
+
   return (
-    <form
-      className="inline-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const value = parseFloat(state.amount);
-        if (!state.description.trim() || !Number.isFinite(value) || value <= 0) return;
-        onSubmit({ ...state, description: state.description.trim() });
-        setState(initial);
-      }}
-    >
-      <input
-        value={state.description}
-        onChange={(e) => setState({ ...state, description: e.target.value })}
-        placeholder="What did you buy?"
-      />
-      <input
-        type="number"
-        min="0.01"
-        step="0.01"
-        value={state.amount}
-        onChange={(e) => setState({ ...state, amount: e.target.value })}
-        placeholder="Amount"
-      />
-      <select
-        value={state.category}
-        onChange={(e) => setState({ ...state, category: e.target.value })}
-      >
-        {CATEGORIES.map((c) => (
-          <option key={c}>{c}</option>
-        ))}
-      </select>
-      <input
-        type="date"
-        value={state.date}
-        onChange={(e) => setState({ ...state, date: e.target.value })}
-      />
-      <button type="submit" className="primary">
-        {submitLabel}
-      </button>
+    <form className="smart-add card" onSubmit={submit}>
+      <div className="row">
+        <input
+          className="grow"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(false);
+          }}
+          placeholder="Coffee 4.50"
+          aria-label="New expense"
+        />
+        <button type="submit" className="primary">
+          Add
+        </button>
+      </div>
+      <div className="chip-row">
+        <CycleChip
+          value={category}
+          options={CATEGORIES}
+          format={(c) => c}
+          label="Category"
+          onChange={setCategory}
+        />
+        <button
+          type="button"
+          className={`chip ${date !== todayStr() ? 'active' : ''}`}
+          onClick={() => setShowDate((s) => !s)}
+        >
+          <CalendarDays size={13} strokeWidth={1.5} />
+          {date === todayStr() ? 'Today' : formatDate(date)}
+        </button>
+        {showDate && (
+          <input
+            type="date"
+            value={date}
+            autoFocus
+            onChange={(e) => {
+              setDate(e.target.value);
+              setShowDate(false);
+            }}
+          />
+        )}
+      </div>
+      <p className={`hint small ${error ? 'warn' : 'muted'}`}>
+        {error
+          ? 'End with the amount — e.g. "Coffee 4.50"'
+          : 'Write what you bought and the amount at the end.'}
+      </p>
     </form>
   );
 }
@@ -87,6 +101,7 @@ export default function Budget({
   const thisMonth = todayStr().slice(0, 7);
   const [month, setMonth] = useState(thisMonth);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingBudget, setEditingBudget] = useState(false);
 
   function shiftMonth(delta: number) {
     const [y, m] = month.split('-').map(Number);
@@ -112,9 +127,7 @@ export default function Budget({
 
   function remove(expense: Expense) {
     setExpenses((prev) => prev.filter((x) => x.id !== expense.id));
-    showUndo(`Deleted "${expense.description}"`, () =>
-      setExpenses((prev) => [...prev, expense]),
-    );
+    showUndo(`Deleted "${expense.description}"`, () => setExpenses((prev) => [...prev, expense]));
   }
 
   return (
@@ -123,43 +136,43 @@ export default function Budget({
         <h1>Budget</h1>
       </header>
 
-      <div className="cal-nav">
-        <button onClick={() => shiftMonth(-1)} aria-label="Previous month">
-          <ChevronLeft size={16} strokeWidth={1.5} />
-        </button>
-        <strong>{monthLabel}</strong>
-        <button onClick={() => shiftMonth(1)} aria-label="Next month">
-          <ChevronRight size={16} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      <section className="card">
+      <section className="card budget-summary">
         <div className="row">
           <span className="grow">
-            Spent <strong>{formatMoney(spent, currency)}</strong>
+            <span className="big-number">{formatMoney(spent, currency)}</span>
+            <span className="muted"> spent</span>
             {budget > 0 && (
               <>
-                {' '}
-                of {formatMoney(budget, currency)} ·{' '}
+                {' · '}
                 <span className={spent > budget ? 'warn' : ''}>
                   {formatMoney(Math.abs(budget - spent), currency)}{' '}
-                  {spent > budget ? 'over' : 'left'}
+                  {spent > budget ? 'over budget' : 'left'}
                 </span>
               </>
             )}
           </span>
-          <label className="row small muted">
-            Monthly budget:&nbsp;
+          {editingBudget ? (
             <input
               type="number"
               min="0"
               step="10"
-              value={budget || ''}
+              autoFocus
+              defaultValue={budget || ''}
               placeholder="0"
-              style={{ width: '6.5rem' }}
-              onChange={(e) => setBudget(parseFloat(e.target.value) || 0)}
+              style={{ width: '7rem' }}
+              onBlur={(e) => {
+                setBudget(parseFloat(e.target.value) || 0);
+                setEditingBudget(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
             />
-          </label>
+          ) : (
+            <button className="chip" onClick={() => setEditingBudget(true)}>
+              {budget > 0 ? `Budget ${formatMoney(budget, currency)}` : 'Set monthly budget'}
+            </button>
+          )}
         </div>
         {budget > 0 && (
           <div className="progress">
@@ -171,23 +184,16 @@ export default function Budget({
         )}
       </section>
 
-      <div className="card">
-        <ExpenseForm
-          initial={{ description: '', amount: '', category: CATEGORIES[0], date: todayStr() }}
-          submitLabel="Add"
-          onSubmit={(s) =>
-            setExpenses((prev) => [
-              ...prev,
-              {
-                id: uid(),
-                description: s.description,
-                amount: parseFloat(s.amount),
-                category: s.category,
-                date: s.date,
-              },
-            ])
-          }
-        />
+      <SmartAddExpense onAdd={(e) => setExpenses((prev) => [...prev, { ...e, id: uid() }])} />
+
+      <div className="cal-nav">
+        <button onClick={() => shiftMonth(-1)} aria-label="Previous month">
+          <ChevronLeft size={16} strokeWidth={1.5} />
+        </button>
+        <strong>{monthLabel}</strong>
+        <button onClick={() => shiftMonth(1)} aria-label="Next month">
+          <ChevronRight size={16} strokeWidth={1.5} />
+        </button>
       </div>
 
       {categoryRows.length > 0 && (
@@ -202,39 +208,25 @@ export default function Budget({
         </section>
       )}
 
-      {monthExpenses.length === 0 && <p className="muted">No expenses logged this month.</p>}
+      {monthExpenses.length === 0 && (
+        <p className="muted empty-note">No expenses logged this month.</p>
+      )}
       <ul className="plain-list">
         {monthExpenses.map((e) =>
           editingId === e.id ? (
             <li key={e.id} className="card">
-              <ExpenseForm
-                initial={{
-                  description: e.description,
-                  amount: String(e.amount),
-                  category: e.category,
-                  date: e.date,
-                }}
-                submitLabel="Save"
-                onSubmit={(s) => {
+              <EditExpenseForm
+                expense={e}
+                onSave={(patch) => {
                   setExpenses((prev) =>
-                    prev.map((x) =>
-                      x.id === e.id
-                        ? {
-                            ...x,
-                            description: s.description,
-                            amount: parseFloat(s.amount),
-                            category: s.category,
-                            date: s.date,
-                          }
-                        : x,
-                    ),
+                    prev.map((x) => (x.id === e.id ? { ...x, ...patch } : x)),
                   );
                   setEditingId(null);
                 }}
               />
             </li>
           ) : (
-            <li key={e.id} className="card row">
+            <li key={e.id} className="card row list-enter">
               <span className="grow">
                 {e.description}
                 <span className="badge">{e.category}</span>
@@ -246,15 +238,62 @@ export default function Budget({
                 aria-label="Edit expense"
                 onClick={() => setEditingId(e.id)}
               >
-                <Pencil size={14} strokeWidth={1.5} />
+                <Pencil size={15} strokeWidth={1.5} />
               </button>
               <button className="icon-btn" aria-label="Delete expense" onClick={() => remove(e)}>
-                <X size={15} strokeWidth={1.5} />
+                <X size={16} strokeWidth={1.5} />
               </button>
             </li>
           ),
         )}
       </ul>
     </div>
+  );
+}
+
+function EditExpenseForm({
+  expense,
+  onSave,
+}: {
+  expense: Expense;
+  onSave: (patch: Partial<Expense>) => void;
+}) {
+  const [description, setDescription] = useState(expense.description);
+  const [amount, setAmount] = useState(String(expense.amount));
+  const [category, setCategory] = useState(expense.category);
+  const [date, setDate] = useState(expense.date);
+  return (
+    <form
+      className="inline-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const value = parseFloat(amount);
+        if (!description.trim() || !Number.isFinite(value) || value <= 0) return;
+        onSave({ description: description.trim(), amount: value, category, date });
+      }}
+    >
+      <input
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        aria-label="Description"
+      />
+      <input
+        type="number"
+        min="0.01"
+        step="0.01"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        aria-label="Amount"
+      />
+      <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        {CATEGORIES.map((c) => (
+          <option key={c}>{c}</option>
+        ))}
+      </select>
+      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <button type="submit" className="primary">
+        Save
+      </button>
+    </form>
   );
 }

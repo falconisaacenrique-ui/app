@@ -2,7 +2,7 @@
   --bg: #ffffff;
   --surface: #ffffff;
   --text: #161616;
-  --muted: #8a8a8a;
+  --muted: #6b6b6b;
   --accent: #4f46e5;
   --accent-soft: #eef0fe;
   --danger: #b91c1c;
@@ -15,7 +15,7 @@
     --bg: #0c0c0e;
     --surface: #0c0c0e;
     --text: #e8e8e8;
-    --muted: #7d7d7d;
+    --muted: #9c9ca3;
     --accent: #818cf8;
     --accent-soft: #1c1d33;
     --danger: #f87171;
@@ -855,4 +855,466 @@ button.primary:hover {
   flex-direction: column;
   gap: 0.25rem;
   min-width: 0;
+}
+
+/* ---- Manual theme override (Settings → Appearance) ---- */
+[data-theme='light'] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #161616;
+  --muted: #6b6b6b;
+  --accent: #4f46e5;
+  --accent-soft: #eef0fe;
+  --danger: #b91c1c;
+  --border: #ebebeb;
+}
+
+[data-theme='dark'] {
+  --bg: #0c0c0e;
+  --surface: #0c0c0e;
+  --text: #e8e8e8;
+  --muted: #9c9ca3;
+  --accent: #818cf8;
+  --accent-soft: #1c1d33;
+  --danger: #f87171;
+  --border: #232326;
+}
+
+/* ---- Motion ---- */
+.view {
+  animation: view-in 0.18s ease-out;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.list-enter {
+  animation: item-in 0.2s ease-out;
+}
+
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+button {
+  transition: transform 0.08s ease, opacity 0.15s ease, color 0.15s ease,
+    border-color 0.15s ease, background-color 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.card.pulse {
+  animation: card-pulse 0.6s ease;
+}
+
+@keyframes card-pulse {
+  0% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  60% {
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---- Check control ---- */
+.check-circle {
+  width: 1.7rem;
+  height: 1.7rem;
+  min-width: 1.7rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.check-circle:hover {
+  border-color: var(--accent);
+}
+
+.check-circle.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: pop 0.3s ease;
+}
+
+/* ---- Smart add ---- */
+.smart-add {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.smart-add input:not([type='date']):not([type='time']):not([type='datetime-local']) {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-weight: 300;
+  min-width: 0;
+}
+
+.smart-add input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.smart-add input[type='date'],
+.smart-add input[type='time'],
+.smart-add input[type='datetime-local'] {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.85rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.chip-row .chip {
+  gap: 0.3rem;
+}
+
+.chip-preview {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+}
+
+.hint em {
+  font-style: normal;
+  color: var(--text);
+}
+
+.empty-note {
+  padding: 1rem 0.25rem;
+}
+
+/* ---- Task groups ---- */
+.task-group {
+  margin-bottom: 1.1rem;
+}
+
+.group-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.group-label.warn {
+  color: var(--danger);
+}
+
+.group-label.as-button {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* ---- Swipe rows ---- */
+.swipe-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.swipe-content {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.15s ease-out;
+  touch-action: pan-y;
+}
+
+.swipe-content .card {
+  margin-bottom: 0;
+}
+
+.swipe-wrap {
+  margin-bottom: 0.4rem;
+}
+
+.swipe-hint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 0.12s;
+  color: #fff;
+}
+
+.swipe-hint.left {
+  justify-content: flex-start;
+  background: #16a34a;
+}
+
+.swipe-hint.right {
+  justify-content: flex-end;
+  background: var(--danger);
+}
+
+.swipe-hint.visible {
+  opacity: 1;
+}
+
+/* ---- Touch targets ---- */
+.icon-btn {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  justify-content: center;
+}
+
+/* ---- Calendar extras ---- */
+.dot-more {
+  font-size: 0.6rem;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.menu-anchor {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 15rem;
+  z-index: 15;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.menu-item:hover {
+  background: var(--accent-soft);
+}
+
+/* ---- More sheet ---- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.35);
+  z-index: 25;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 30rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  animation: sheet-up 0.18s ease-out;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(30%);
+    opacity: 0.5;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text);
+  text-align: left;
+}
+
+.sheet-item:hover,
+.sheet-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---- Welcome & dashboard ---- */
+.welcome {
+  border-color: var(--accent);
+}
+
+.welcome h2 {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.cta-text {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--accent);
+  margin: 0;
+}
+
+.link.accent {
+  color: var(--accent);
+}
+
+.big-number {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.badge.milestone {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.badge .lucide {
+  vertical-align: -2px;
+}
+
+/* ---- Shortcuts ---- */
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem 1rem;
+  align-items: center;
+}
+
+kbd {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0.05rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  background: var(--bg);
+}
+
+/* ---- Nav: desktop shows everything, mobile shows 4 + More ---- */
+.nav-extra {
+  display: contents;
+}
+
+.nav-more {
+  display: none;
+}
+
+.main {
+  padding-bottom: 7rem; /* clearance for the floating add button */
+}
+
+@media (max-width: 720px) {
+  .nav-extra {
+    display: none;
+  }
+
+  .nav-more {
+    display: flex;
+  }
+
+  .modal-backdrop {
+    padding-top: 10vh;
+  }
+
+  .week-day-label {
+    width: 5.2rem;
+  }
 }

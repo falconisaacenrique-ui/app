@@ -1,7 +1,19 @@
 import { useRef, useState } from 'react';
-import { CheckSquare, ChevronLeft, ChevronRight, Download, Pencil, Upload, X } from 'lucide-react';
+import {
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  Pencil,
+  RefreshCw,
+  Upload,
+  X,
+} from 'lucide-react';
+import CycleChip from '../components/CycleChip';
 import { exportICS, importICS } from '../ics';
 import { occursOn, REPEAT_LABELS } from '../recurrence';
+import { parseQuickAdd } from '../quickadd';
 import type { CalendarEvent, Repeat, Task } from '../types';
 import { formatDate, formatTime, toDateStr, todayStr, uid } from '../utils';
 import type { UndoToast } from '../App';
@@ -10,10 +22,105 @@ interface Props {
   events: CalendarEvent[];
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
   tasks: Task[];
-  showUndo: (message: string, undo: UndoToast['undo']) => void;
+  showUndo: (message: string, undo: NonNullable<UndoToast['undo']>) => void;
 }
 
 const COLORS = ['#4f46e5', '#64748b', '#a8a29e', '#171717'];
+const REPEATS = ['', 'daily', 'weekly', 'monthly'] as const;
+
+function repeatLabel(r: '' | Repeat): string {
+  return REPEAT_LABELS.find((x) => x.value === r)?.label ?? 'Once';
+}
+
+function SmartAddEvent({
+  date,
+  onAdd,
+}: {
+  date: string;
+  onAdd: (e: Omit<CalendarEvent, 'id' | 'date'>) => void;
+}) {
+  const [text, setText] = useState('');
+  const [time, setTime] = useState('');
+  const [showTime, setShowTime] = useState(false);
+  const [repeat, setRepeat] = useState<'' | Repeat>('');
+  const [color, setColor] = useState(COLORS[0]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const parsed = parseQuickAdd(text);
+    if (!parsed.text.trim()) return;
+    onAdd({
+      title: parsed.text,
+      time: time || parsed.time || undefined,
+      color,
+      repeat: repeat || undefined,
+    });
+    setText('');
+    setTime('');
+    setShowTime(false);
+  }
+
+  return (
+    <form className="smart-add" onSubmit={submit}>
+      <div className="row">
+        <input
+          className="grow"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={`Add to ${formatDate(date)}…`}
+          aria-label="New event"
+        />
+        <button type="submit" className="primary">
+          Add
+        </button>
+      </div>
+      <div className="chip-row">
+        <button
+          type="button"
+          className={`chip ${time ? 'active' : ''}`}
+          onClick={() => setShowTime((s) => !s)}
+        >
+          <Clock size={13} strokeWidth={1.5} />
+          {time ? formatTime(time) : 'Time'}
+        </button>
+        {showTime && (
+          <input
+            type="time"
+            value={time}
+            autoFocus
+            onChange={(e) => {
+              setTime(e.target.value);
+              setShowTime(false);
+            }}
+          />
+        )}
+        <CycleChip
+          value={repeat}
+          options={REPEATS}
+          format={repeatLabel}
+          label="Repeat"
+          active={repeat !== ''}
+          onChange={setRepeat}
+        />
+        <span className="color-row">
+          {COLORS.map((c) => (
+            <button
+              type="button"
+              key={c}
+              className={`color-swatch ${c === color ? 'active' : ''}`}
+              style={{ background: c }}
+              aria-label={`Color ${c}`}
+              onClick={() => setColor(c)}
+            />
+          ))}
+        </span>
+      </div>
+      <p className="hint muted small">
+        Type the time in the text — <em>3pm Dentist</em>
+      </p>
+    </form>
+  );
+}
 
 interface EventFormState {
   title: string;
@@ -23,15 +130,11 @@ interface EventFormState {
   repeat: '' | Repeat;
 }
 
-const EMPTY_FORM: EventFormState = { title: '', time: '', notes: '', color: COLORS[0], repeat: '' };
-
-function EventForm({
+function EditEventForm({
   initial,
-  submitLabel,
   onSubmit,
 }: {
   initial: EventFormState;
-  submitLabel: string;
   onSubmit: (state: EventFormState) => void;
 }) {
   const [state, setState] = useState(initial);
@@ -42,13 +145,12 @@ function EventForm({
         e.preventDefault();
         if (!state.title.trim()) return;
         onSubmit({ ...state, title: state.title.trim() });
-        setState(EMPTY_FORM);
       }}
     >
       <input
         value={state.title}
         onChange={(e) => setState({ ...state, title: e.target.value })}
-        placeholder="Event title…"
+        aria-label="Event title"
       />
       <input
         type="time"
@@ -83,7 +185,7 @@ function EventForm({
         ))}
       </div>
       <button type="submit" className="primary">
-        {submitLabel}
+        Save
       </button>
     </form>
   );
@@ -97,7 +199,9 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
   const [selected, setSelected] = useState(todayStr());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [mode, setMode] = useState<'month' | 'week'>('month');
+  const [syncOpen, setSyncOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -118,6 +222,12 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
   );
   const selectedTasks = tasksOn(selected);
 
+  function selectDay(date: string) {
+    setSelected(date);
+    // Bring the day panel into view — on phones it sits below the fold.
+    setTimeout(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
+
   function remove(event: CalendarEvent) {
     setEvents((prev) => prev.filter((x) => x.id !== event.id));
     showUndo(`Deleted "${event.title}"`, () => setEvents((prev) => [...prev, event]));
@@ -131,10 +241,12 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
     a.download = 'lifehub-calendar.ics';
     a.click();
     URL.revokeObjectURL(url);
+    setSyncOpen(false);
   }
 
   async function handleImportICS(file: File) {
     const imported = importICS(await file.text());
+    setSyncOpen(false);
     if (imported.length === 0) return;
     setEvents((prev) => [...prev, ...imported]);
     showUndo(`Imported ${imported.length} event${imported.length > 1 ? 's' : ''}`, () =>
@@ -177,17 +289,29 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
             </button>
           ))}
         </div>
-        <button className="icon-btn" aria-label="Export calendar (.ics)" title="Export .ics" onClick={downloadICS}>
-          <Download size={15} strokeWidth={1.5} />
-        </button>
-        <button
-          className="icon-btn"
-          aria-label="Import calendar (.ics)"
-          title="Import .ics"
-          onClick={() => fileRef.current?.click()}
-        >
-          <Upload size={15} strokeWidth={1.5} />
-        </button>
+        <div className="menu-anchor">
+          <button
+            className="chip row"
+            aria-expanded={syncOpen}
+            onClick={() => setSyncOpen((o) => !o)}
+          >
+            <RefreshCw size={13} strokeWidth={1.5} /> Sync
+          </button>
+          {syncOpen && (
+            <div className="menu" role="menu">
+              <button role="menuitem" className="menu-item" onClick={downloadICS}>
+                <Download size={14} strokeWidth={1.5} /> Export .ics (Google/Apple)
+              </button>
+              <button
+                role="menuitem"
+                className="menu-item"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload size={14} strokeWidth={1.5} /> Import .ics file
+              </button>
+            </div>
+          )}
+        </div>
         <input
           ref={fileRef}
           type="file"
@@ -221,27 +345,26 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
                 {d}
               </div>
             ))}
-            {cells.map((date, i) =>
-              date === null ? (
-                <div key={`empty-${i}`} className="cal-cell empty" />
-              ) : (
+            {cells.map((date, i) => {
+              if (date === null) return <div key={`empty-${i}`} className="cal-cell empty" />;
+              const dayEvents = eventsOn(date);
+              return (
                 <button
                   key={date}
                   className={`cal-cell ${date === today ? 'today' : ''} ${date === selected ? 'selected' : ''}`}
-                  onClick={() => setSelected(date)}
+                  onClick={() => selectDay(date)}
                 >
                   <span>{Number(date.slice(8))}</span>
                   <div className="cal-dots">
-                    {eventsOn(date)
-                      .slice(0, 3)
-                      .map((e) => (
-                        <span key={e.id} className="dot" style={{ background: e.color }} />
-                      ))}
+                    {dayEvents.slice(0, 3).map((e) => (
+                      <span key={e.id} className="dot" style={{ background: e.color }} />
+                    ))}
+                    {dayEvents.length > 3 && <span className="dot-more">+{dayEvents.length - 3}</span>}
                     {tasksOn(date).length > 0 && <span className="dot dot-task" />}
                   </div>
                 </button>
-              ),
-            )}
+              );
+            })}
           </div>
         </>
       ) : (
@@ -268,7 +391,7 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
                 <button
                   key={date}
                   className={`card week-day ${date === selected ? 'selected-day' : ''} ${date === today ? 'today-day' : ''}`}
-                  onClick={() => setSelected(date)}
+                  onClick={() => selectDay(date)}
                 >
                   <span className={`week-day-label ${date === today ? 'accent' : 'muted'}`}>
                     {formatDate(date)}
@@ -298,7 +421,7 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
         </>
       )}
 
-      <section className="card">
+      <section className="card" ref={panelRef}>
         <h2>{formatDate(selected)}</h2>
         {selectedEvents.length === 0 && selectedTasks.length === 0 && (
           <p className="muted">Nothing on this day.</p>
@@ -307,7 +430,7 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
           {selectedEvents.map((e) =>
             editingId === e.id ? (
               <li key={e.id}>
-                <EventForm
+                <EditEventForm
                   initial={{
                     title: e.title,
                     time: e.time ?? '',
@@ -315,7 +438,6 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
                     color: e.color,
                     repeat: e.repeat ?? '',
                   }}
-                  submitLabel="Save"
                   onSubmit={(s) => {
                     setEvents((prev) =>
                       prev.map((x) =>
@@ -336,7 +458,7 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
                 />
               </li>
             ) : (
-              <li key={e.id} className="row event-row">
+              <li key={e.id} className="row event-row list-enter">
                 <span className="dot" style={{ background: e.color }} />
                 <span className="grow">
                   {e.time && <strong>{formatTime(e.time)} · </strong>}
@@ -344,15 +466,11 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
                   {e.repeat && <span className="badge">{e.repeat}</span>}
                   {e.notes && <div className="muted small">{e.notes}</div>}
                 </span>
-                <button
-                  className="icon-btn"
-                  aria-label="Edit event"
-                  onClick={() => setEditingId(e.id)}
-                >
-                  <Pencil size={14} strokeWidth={1.5} />
+                <button className="icon-btn" aria-label="Edit event" onClick={() => setEditingId(e.id)}>
+                  <Pencil size={15} strokeWidth={1.5} />
                 </button>
                 <button className="icon-btn" aria-label="Delete event" onClick={() => remove(e)}>
-                  <X size={15} strokeWidth={1.5} />
+                  <X size={16} strokeWidth={1.5} />
                 </button>
               </li>
             ),
@@ -367,23 +485,9 @@ export default function Calendar({ events, setEvents, tasks, showUndo }: Props) 
         </ul>
 
         {editingId === null && (
-          <EventForm
-            initial={EMPTY_FORM}
-            submitLabel="Add"
-            onSubmit={(s) =>
-              setEvents((prev) => [
-                ...prev,
-                {
-                  id: uid(),
-                  title: s.title,
-                  date: selected,
-                  time: s.time || undefined,
-                  notes: s.notes || undefined,
-                  color: s.color,
-                  repeat: s.repeat || undefined,
-                },
-              ])
-            }
+          <SmartAddEvent
+            date={selected}
+            onAdd={(e) => setEvents((prev) => [...prev, { ...e, id: uid(), date: selected }])}
           />
         )}
       </section>

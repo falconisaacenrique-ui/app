@@ -8,7 +8,7 @@ import type { UndoToast } from '../App';
 interface Props {
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
-  showUndo: (message: string, undo: UndoToast['undo']) => void;
+  showUndo: (message: string, undo: NonNullable<UndoToast['undo']>) => void;
 }
 
 export default function Notes({ notes, setNotes, showUndo }: Props) {
