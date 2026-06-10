@@ -2,13 +2,14 @@
   "name": "LifeHub — Daily Life Command Center",
   "short_name": "LifeHub",
   "description": "Calendar, notes, reminders, tasks, habits, and budget — all in one private, offline-first app.",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f1f3f9",
-  "theme_color": "#6366f1",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
