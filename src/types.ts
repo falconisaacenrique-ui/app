@@ -1,10 +1,13 @@
+export type Repeat = 'daily' | 'weekly' | 'monthly';
+
 export interface CalendarEvent {
   id: string;
   title: string;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (first occurrence when repeating)
   time?: string; // HH:MM
   notes?: string;
   color: string;
+  repeat?: Repeat;
 }
 
 export interface Note {
@@ -21,6 +24,7 @@ export interface Reminder {
   datetime: string; // ISO local "YYYY-MM-DDTHH:MM"
   done: boolean;
   notified: boolean;
+  repeat?: Repeat;
 }
 
 export type Priority = 'low' | 'medium' | 'high';
@@ -32,6 +36,7 @@ export interface Task {
   due?: string; // YYYY-MM-DD
   priority: Priority;
   createdAt: number;
+  repeat?: Repeat; // completing a repeating task advances its due date
 }
 
 export interface Habit {
@@ -39,6 +44,7 @@ export interface Habit {
   name: string;
   icon: string;
   doneDates: string[]; // YYYY-MM-DD
+  target?: number; // check-offs per week; 7 or undefined = daily
 }
 
 export interface Expense {
@@ -49,6 +55,10 @@ export interface Expense {
   date: string; // YYYY-MM-DD
 }
 
+export interface Settings {
+  currency: string; // ISO 4217 code, e.g. "USD"
+}
+
 export type View =
   | 'dashboard'
   | 'calendar'
@@ -56,4 +66,6 @@ export type View =
   | 'notes'
   | 'reminders'
   | 'habits'
-  | 'budget';
+  | 'budget'
+  | 'search'
+  | 'settings';

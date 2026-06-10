@@ -3,12 +3,15 @@ import { ChevronLeft, Pin, Plus, Trash2 } from 'lucide-react';
 import type { Note } from '../types';
 import { uid } from '../utils';
 
+import type { UndoToast } from '../App';
+
 interface Props {
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+  showUndo: (message: string, undo: UndoToast['undo']) => void;
 }
 
-export default function Notes({ notes, setNotes }: Props) {
+export default function Notes({ notes, setNotes, showUndo }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   const open = notes.find((n) => n.id === openId) ?? null;
@@ -52,8 +55,12 @@ export default function Notes({ notes, setNotes }: Props) {
           <button
             className="chip row danger"
             onClick={() => {
-              setNotes((prev) => prev.filter((n) => n.id !== open.id));
+              const deleted = open;
+              setNotes((prev) => prev.filter((n) => n.id !== deleted.id));
               setOpenId(null);
+              showUndo(`Deleted "${deleted.title || 'Untitled'}"`, () =>
+                setNotes((prev) => [deleted, ...prev]),
+              );
             }}
           >
             <Trash2 size={14} strokeWidth={1.5} /> Delete

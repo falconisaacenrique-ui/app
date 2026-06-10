@@ -1,4 +1,5 @@
 export function uid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
@@ -40,12 +41,16 @@ export function formatDateTime(iso: string): string {
   });
 }
 
-export function formatMoney(n: number): string {
-  return n.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  });
+export function formatMoney(n: number, currency: string = 'USD'): string {
+  try {
+    return n.toLocaleString(undefined, {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    return `${currency} ${n.toFixed(2)}`;
+  }
 }
 
 /** Consecutive-day streak ending today or yesterday. */
@@ -70,4 +75,16 @@ export function lastNDays(n: number): string[] {
     days.push(toDateStr(dd));
   }
   return days;
+}
+
+/** Check-offs in the calendar week (Mon-Sun) containing `date`. */
+export function doneThisWeek(doneDates: string[], date: Date = new Date()): number {
+  const monday = new Date(date);
+  const day = (monday.getDay() + 6) % 7; // 0 = Monday
+  monday.setDate(monday.getDate() - day);
+  const start = toDateStr(monday);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const end = toDateStr(sunday);
+  return doneDates.filter((d) => d >= start && d <= end).length;
 }

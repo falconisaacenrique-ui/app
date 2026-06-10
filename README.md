@@ -9,15 +9,23 @@ See [GOAL.md](GOAL.md) — the full product goal this app implements.
 
 ## Features
 
-- **Daily dashboard** — today at a glance: events, due tasks, upcoming reminders, habit
-  progress, and monthly spending, with each card linking to its section.
-- **Calendar** — month view with color-coded events and times.
-- **Tasks** — to-dos with due dates, priorities, and overdue highlighting.
+- **Daily dashboard** — a unified timeline of today's events, reminders, and due tasks
+  in time order, plus habit and budget summaries.
+- **Quick add** — one button, natural language: "dentist tomorrow 3pm" becomes an
+  event, "remind me to call mom 9am" a reminder, "buy groceries friday" a task.
+- **Calendar** — month view with color-coded, repeating events (daily/weekly/monthly),
+  event notes, and due tasks shown on their day.
+- **Tasks** — due dates, priorities, repeats (completing reschedules), and editing.
 - **Notes** — a notepad with pinning and auto-save.
-- **Reminders** — date/time reminders with browser notifications when due.
-- **Habits** — daily habit tracking with streaks and a 7-day week view.
-- **Budget** — expense logging, category breakdown, and a monthly budget bar.
-- **PWA** — installable to your phone/desktop home screen and works offline.
+- **Reminders** — one-off or repeating, with notifications via the service worker.
+- **Habits** — daily or n-times-a-week targets, streaks, and a 12-week heatmap.
+- **Budget** — expense logging with categories, month-by-month history, monthly budget
+  bar, and a configurable currency.
+- **Search** — across notes, tasks, events, reminders, and expenses.
+- **Undo** — every delete shows an undo toast.
+- **Backup** — export/import all data as JSON from Settings; storage persistence is
+  requested so the browser protects your data.
+- **PWA** — installable, offline-capable, hash-routed so the back button works.
 
 ## Design
 

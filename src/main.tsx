@@ -1,7 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import { migrate, requestPersistence } from './storage';
 import App from './App';
+
+migrate();
+void requestPersistence();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
