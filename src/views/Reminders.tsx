@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { Reminder } from '../types';
 import { formatDateTime, uid } from '../utils';
 
@@ -101,7 +102,7 @@ export default function Reminders({ reminders, setReminders }: Props) {
                 aria-label="Delete reminder"
                 onClick={() => setReminders((prev) => prev.filter((x) => x.id !== r.id))}
               >
-                ✕
+                <X size={15} strokeWidth={1.5} />
               </button>
             </li>
           );

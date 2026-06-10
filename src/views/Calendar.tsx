@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import { formatDate, formatTime, toDateStr, todayStr, uid } from '../utils';
 
@@ -7,7 +8,7 @@ interface Props {
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
 }
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#4f46e5', '#64748b', '#a8a29e', '#171717'];
 
 export default function Calendar({ events, setEvents }: Props) {
   const [cursor, setCursor] = useState(() => {
@@ -61,11 +62,11 @@ export default function Calendar({ events, setEvents }: Props) {
       </header>
 
       <div className="cal-nav">
-        <button onClick={() => setCursor(new Date(year, month - 1, 1))}>‹</button>
+        <button onClick={() => setCursor(new Date(year, month - 1, 1))}><ChevronLeft size={16} strokeWidth={1.5} /></button>
         <strong>
           {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
         </strong>
-        <button onClick={() => setCursor(new Date(year, month + 1, 1))}>›</button>
+        <button onClick={() => setCursor(new Date(year, month + 1, 1))}><ChevronRight size={16} strokeWidth={1.5} /></button>
       </div>
 
       <div className="cal-grid">
@@ -110,7 +111,7 @@ export default function Calendar({ events, setEvents }: Props) {
                 aria-label="Delete event"
                 onClick={() => setEvents((prev) => prev.filter((x) => x.id !== e.id))}
               >
-                ✕
+                <X size={15} strokeWidth={1.5} />
               </button>
             </li>
           ))}

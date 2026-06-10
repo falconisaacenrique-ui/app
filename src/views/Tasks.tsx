@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { Priority, Task } from '../types';
 import { formatDate, todayStr, uid } from '../utils';
 
@@ -110,7 +111,7 @@ export default function Tasks({ tasks, setTasks }: Props) {
               aria-label="Delete task"
               onClick={() => setTasks((prev) => prev.filter((x) => x.id !== t.id))}
             >
-              ✕
+              <X size={15} strokeWidth={1.5} />
             </button>
           </li>
         ))}

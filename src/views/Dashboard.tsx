@@ -1,3 +1,11 @@
+import {
+  Bell,
+  Calendar as CalendarIcon,
+  CheckSquare,
+  Flame,
+  StickyNote,
+  Wallet,
+} from 'lucide-react';
 import type { CalendarEvent, Expense, Habit, Reminder, Task, View } from '../types';
 import { formatMoney, formatTime, todayStr } from '../utils';
 
@@ -53,13 +61,15 @@ export default function Dashboard({
   return (
     <div className="view">
       <header className="view-header">
-        <h1>{greeting()}!</h1>
+        <h1>{greeting()}</h1>
         <p className="muted">{dateLabel}</p>
       </header>
 
       <div className="dash-grid">
         <section className="card clickable" onClick={() => onNavigate('calendar')}>
-          <h2>📅 Today's events</h2>
+          <h2>
+            <CalendarIcon size={15} strokeWidth={1.5} /> Today's events
+          </h2>
           {todayEvents.length === 0 ? (
             <p className="muted">Nothing scheduled today.</p>
           ) : (
@@ -75,7 +85,9 @@ export default function Dashboard({
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('tasks')}>
-          <h2>✅ Tasks</h2>
+          <h2>
+            <CheckSquare size={15} strokeWidth={1.5} /> Tasks
+          </h2>
           {dueTasks.length > 0 && (
             <p className="warn">
               {dueTasks.length} task{dueTasks.length > 1 ? 's' : ''} due or overdue
@@ -83,13 +95,15 @@ export default function Dashboard({
           )}
           <p className="muted">
             {openTasks.length === 0
-              ? 'All caught up!'
+              ? 'All caught up.'
               : `${openTasks.length} open task${openTasks.length > 1 ? 's' : ''}`}
           </p>
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('reminders')}>
-          <h2>⏰ Reminders</h2>
+          <h2>
+            <Bell size={15} strokeWidth={1.5} /> Reminders
+          </h2>
           {upcomingReminders.length === 0 ? (
             <p className="muted">No upcoming reminders.</p>
           ) : (
@@ -105,7 +119,9 @@ export default function Dashboard({
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('habits')}>
-          <h2>🔥 Habits</h2>
+          <h2>
+            <Flame size={15} strokeWidth={1.5} /> Habits
+          </h2>
           {habits.length === 0 ? (
             <p className="muted">No habits tracked yet.</p>
           ) : (
@@ -127,7 +143,9 @@ export default function Dashboard({
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('budget')}>
-          <h2>💰 This month</h2>
+          <h2>
+            <Wallet size={15} strokeWidth={1.5} /> This month
+          </h2>
           <p>
             Spent <strong>{formatMoney(spent)}</strong>
             {budget > 0 && <> of {formatMoney(budget)} budget</>}
@@ -143,8 +161,10 @@ export default function Dashboard({
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('notes')}>
-          <h2>📝 Notes</h2>
-          <p className="muted">Jot something down →</p>
+          <h2>
+            <StickyNote size={15} strokeWidth={1.5} /> Notes
+          </h2>
+          <p className="muted">Jot something down</p>
         </section>
       </div>
     </div>

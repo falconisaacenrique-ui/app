@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react';
+import {
+  Bell,
+  Calendar as CalendarIcon,
+  CheckSquare,
+  Flame,
+  LayoutDashboard,
+  StickyNote,
+  Wallet,
+} from 'lucide-react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type {
   CalendarEvent,
@@ -17,14 +26,14 @@ import Reminders from './views/Reminders';
 import Habits from './views/Habits';
 import Budget from './views/Budget';
 
-const NAV: { view: View; label: string; icon: string }[] = [
-  { view: 'dashboard', label: 'Home', icon: '🏠' },
-  { view: 'calendar', label: 'Calendar', icon: '📅' },
-  { view: 'tasks', label: 'Tasks', icon: '✅' },
-  { view: 'notes', label: 'Notes', icon: '📝' },
-  { view: 'reminders', label: 'Reminders', icon: '⏰' },
-  { view: 'habits', label: 'Habits', icon: '🔥' },
-  { view: 'budget', label: 'Budget', icon: '💰' },
+const NAV: { view: View; label: string; icon: typeof Bell }[] = [
+  { view: 'dashboard', label: 'Today', icon: LayoutDashboard },
+  { view: 'calendar', label: 'Calendar', icon: CalendarIcon },
+  { view: 'tasks', label: 'Tasks', icon: CheckSquare },
+  { view: 'notes', label: 'Notes', icon: StickyNote },
+  { view: 'reminders', label: 'Reminders', icon: Bell },
+  { view: 'habits', label: 'Habits', icon: Flame },
+  { view: 'budget', label: 'Budget', icon: Wallet },
 ];
 
 export default function App() {
@@ -64,17 +73,17 @@ export default function App() {
     <div className="app">
       <nav className="nav">
         <div className="brand">
-          <span className="brand-mark">◆</span>
+          <span className="brand-mark" />
           <span className="brand-name">LifeHub</span>
         </div>
-        {NAV.map((item) => (
+        {NAV.map(({ view: v, label, icon: Icon }) => (
           <button
-            key={item.view}
-            className={`nav-item ${view === item.view ? 'active' : ''}`}
-            onClick={() => setView(item.view)}
+            key={v}
+            className={`nav-item ${view === v ? 'active' : ''}`}
+            onClick={() => setView(v)}
           >
-            <span className="nav-icon">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
+            <Icon className="nav-icon" size={18} strokeWidth={1.5} />
+            <span className="nav-label">{label}</span>
           </button>
         ))}
       </nav>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import type { Expense } from '../types';
 import { formatDate, formatMoney, todayStr, uid } from '../utils';
 
@@ -139,7 +140,7 @@ export default function Budget({ expenses, setExpenses, budget, setBudget }: Pro
               aria-label="Delete expense"
               onClick={() => setExpenses((prev) => prev.filter((x) => x.id !== e.id))}
             >
-              ✕
+              <X size={15} strokeWidth={1.5} />
             </button>
           </li>
         ))}

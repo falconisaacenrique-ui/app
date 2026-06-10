@@ -1,4 +1,16 @@
 import { useState } from 'react';
+import {
+  Bed,
+  BookOpen,
+  Droplet,
+  Dumbbell,
+  Flame,
+  Footprints,
+  PenLine,
+  Salad,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import type { Habit } from '../types';
 import { lastNDays, streak, todayStr, uid } from '../utils';
 
@@ -7,11 +19,27 @@ interface Props {
   setHabits: React.Dispatch<React.SetStateAction<Habit[]>>;
 }
 
-const ICONS = ['💪', '📖', '💧', '🧘', '🏃', '🛏️', '🥗', '✍️'];
+const ICONS = {
+  exercise: Dumbbell,
+  read: BookOpen,
+  water: Droplet,
+  mindfulness: Sparkles,
+  walk: Footprints,
+  sleep: Bed,
+  eat: Salad,
+  write: PenLine,
+} as const;
+
+type IconKey = keyof typeof ICONS;
+
+function HabitIcon({ name }: { name: string }) {
+  const Icon = ICONS[name as IconKey] ?? Flame;
+  return <Icon size={16} strokeWidth={1.5} />;
+}
 
 export default function Habits({ habits, setHabits }: Props) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState(ICONS[0]);
+  const [icon, setIcon] = useState<IconKey>('exercise');
   const today = todayStr();
   const week = lastNDays(7);
 
@@ -44,13 +72,19 @@ export default function Habits({ habits, setHabits }: Props) {
       </header>
 
       <form onSubmit={addHabit} className="inline-form card">
-        <select value={icon} onChange={(e) => setIcon(e.target.value)}>
-          {ICONS.map((i) => (
-            <option key={i} value={i}>
-              {i}
-            </option>
+        <div className="icon-picker">
+          {(Object.keys(ICONS) as IconKey[]).map((key) => (
+            <button
+              type="button"
+              key={key}
+              className={`icon-choice ${icon === key ? 'active' : ''}`}
+              title={key}
+              onClick={() => setIcon(key)}
+            >
+              <HabitIcon name={key} />
+            </button>
           ))}
-        </select>
+        </div>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -68,16 +102,21 @@ export default function Habits({ habits, setHabits }: Props) {
           return (
             <li key={h.id} className="card habit">
               <div className="row">
-                <span className="grow">
-                  {h.icon} <strong>{h.name}</strong>
-                  {s > 0 && <span className="badge streak">🔥 {s} day{s > 1 ? 's' : ''}</span>}
+                <span className="grow row">
+                  <HabitIcon name={h.icon} />
+                  <strong>{h.name}</strong>
+                  {s > 0 && (
+                    <span className="badge streak">
+                      {s} day{s > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </span>
                 <button
                   className="icon-btn"
                   aria-label="Delete habit"
                   onClick={() => setHabits((prev) => prev.filter((x) => x.id !== h.id))}
                 >
-                  ✕
+                  <X size={15} strokeWidth={1.5} />
                 </button>
               </div>
               <div className="week-row">

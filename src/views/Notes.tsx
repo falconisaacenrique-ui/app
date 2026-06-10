@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronLeft, Pin, Plus, Trash2 } from 'lucide-react';
 import type { Note } from '../types';
 import { uid } from '../utils';
 
@@ -39,23 +40,23 @@ export default function Notes({ notes, setNotes }: Props) {
     return (
       <div className="view">
         <header className="view-header row">
-          <button className="chip" onClick={() => setOpenId(null)}>
-            ‹ Back
+          <button className="chip row" onClick={() => setOpenId(null)}>
+            <ChevronLeft size={14} strokeWidth={1.5} /> Back
           </button>
           <button
-            className="chip"
+            className={`chip row ${open.pinned ? 'active' : ''}`}
             onClick={() => update(open.id, { pinned: !open.pinned })}
           >
-            {open.pinned ? '📌 Pinned' : 'Pin'}
+            <Pin size={14} strokeWidth={1.5} /> {open.pinned ? 'Pinned' : 'Pin'}
           </button>
           <button
-            className="chip danger"
+            className="chip row danger"
             onClick={() => {
               setNotes((prev) => prev.filter((n) => n.id !== open.id));
               setOpenId(null);
             }}
           >
-            Delete
+            <Trash2 size={14} strokeWidth={1.5} /> Delete
           </button>
         </header>
         <input
@@ -79,17 +80,17 @@ export default function Notes({ notes, setNotes }: Props) {
     <div className="view">
       <header className="view-header row">
         <h1 className="grow">Notes</h1>
-        <button className="primary" onClick={createNote}>
-          + New note
+        <button className="primary row" onClick={createNote}>
+          <Plus size={15} strokeWidth={1.5} /> New note
         </button>
       </header>
 
-      {sorted.length === 0 && <p className="muted">No notes yet — create one!</p>}
+      {sorted.length === 0 && <p className="muted">No notes yet — create one.</p>}
       <div className="notes-grid">
         {sorted.map((n) => (
           <button key={n.id} className="card note-card" onClick={() => setOpenId(n.id)}>
-            <h3>
-              {n.pinned && '📌 '}
+            <h3 className="row">
+              {n.pinned && <Pin size={13} strokeWidth={1.5} />}
               {n.title || 'Untitled'}
             </h3>
             <p>{n.content.slice(0, 120) || 'Empty note'}</p>
