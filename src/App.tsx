@@ -34,6 +34,7 @@ import Habits from './views/Habits';
 import Budget from './views/Budget';
 import SearchView from './views/Search';
 import SettingsView from './views/Settings';
+import Review from './views/Review';
 
 const NAV: { view: View; label: string; icon: typeof Bell }[] = [
   { view: 'dashboard', label: 'Today', icon: LayoutDashboard },
@@ -47,7 +48,7 @@ const NAV: { view: View; label: string; icon: typeof Bell }[] = [
   { view: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const VIEWS = new Set<string>(NAV.map((n) => n.view));
+const VIEWS = new Set<string>([...NAV.map((n) => n.view), 'review']);
 
 function viewFromHash(): View {
   const v = window.location.hash.replace(/^#\/?/, '');
@@ -252,6 +253,17 @@ export default function App() {
         )}
         {view === 'settings' && (
           <SettingsView settings={settings} setSettings={setSettings} />
+        )}
+        {view === 'review' && (
+          <Review
+            events={events}
+            tasks={tasks}
+            reminders={reminders}
+            habits={habits}
+            expenses={expenses}
+            budget={budget}
+            currency={settings.currency}
+          />
         )}
       </main>
 

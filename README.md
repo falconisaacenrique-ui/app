@@ -13,8 +13,9 @@ See [GOAL.md](GOAL.md) — the full product goal this app implements.
   in time order, plus habit and budget summaries.
 - **Quick add** — one button, natural language: "dentist tomorrow 3pm" becomes an
   event, "remind me to call mom 9am" a reminder, "buy groceries friday" a task.
-- **Calendar** — month view with color-coded, repeating events (daily/weekly/monthly),
-  event notes, and due tasks shown on their day.
+- **Calendar** — month and week views with color-coded, repeating events
+  (daily/weekly/monthly), event notes, due tasks shown on their day, and
+  ICS import/export to sync with Google/Apple/Outlook calendars.
 - **Tasks** — due dates, priorities, repeats (completing reschedules), and editing.
 - **Notes** — a notepad with pinning and auto-save.
 - **Reminders** — one-off or repeating, with notifications via the service worker.
@@ -23,8 +24,11 @@ See [GOAL.md](GOAL.md) — the full product goal this app implements.
   bar, and a configurable currency.
 - **Search** — across notes, tasks, events, reminders, and expenses.
 - **Undo** — every delete shows an undo toast.
-- **Backup** — export/import all data as JSON from Settings; storage persistence is
-  requested so the browser protects your data.
+- **Weekly review** — tasks completed vs. slipped, habit consistency, weekly
+  spending, and a preview of the week ahead.
+- **Backup & transfer** — export/import all data as JSON, or as a password-encrypted
+  (AES-GCM) file safe to move between devices through any channel; storage
+  persistence is requested so the browser protects your data.
 - **PWA** — installable, offline-capable, hash-routed so the back button works.
 
 ## Design

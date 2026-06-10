@@ -36,6 +36,7 @@ export interface Task {
   due?: string; // YYYY-MM-DD
   priority: Priority;
   createdAt: number;
+  doneAt?: number; // when the task was completed
   repeat?: Repeat; // completing a repeating task advances its due date
 }
 
@@ -68,4 +69,5 @@ export type View =
   | 'habits'
   | 'budget'
   | 'search'
-  | 'settings';
+  | 'settings'
+  | 'review';

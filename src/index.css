@@ -814,3 +814,45 @@ button.primary:hover {
     width: 3.6rem;
   }
 }
+
+/* ---- Week view ---- */
+.week-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.week-day {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.week-day.selected-day {
+  border-color: var(--text);
+}
+
+.week-day.today-day .week-day-label {
+  font-weight: 600;
+}
+
+.week-day-label {
+  width: 7rem;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.week-day-label.accent {
+  color: var(--accent);
+}
+
+.week-day-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}

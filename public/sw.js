@@ -1,4 +1,4 @@
-const CACHE = 'lifehub-v2';
+const CACHE = 'lifehub-v3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./'])));

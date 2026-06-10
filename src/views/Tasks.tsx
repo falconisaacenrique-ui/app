@@ -88,7 +88,7 @@ export default function Tasks({ tasks, setTasks, showUndo }: Props) {
         if (!t.done && t.repeat && t.due) {
           return { ...t, due: nextDate(t.due, t.repeat, today >= t.due ? today : t.due) };
         }
-        return { ...t, done: !t.done };
+        return { ...t, done: !t.done, doneAt: t.done ? undefined : Date.now() };
       }),
     );
   }

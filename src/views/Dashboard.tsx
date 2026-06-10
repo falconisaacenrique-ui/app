@@ -1,4 +1,11 @@
-import { Bell, Calendar as CalendarIcon, CheckSquare, Flame, Wallet } from 'lucide-react';
+import {
+  Bell,
+  Calendar as CalendarIcon,
+  CheckSquare,
+  ClipboardList,
+  Flame,
+  Wallet,
+} from 'lucide-react';
 import { occursOn } from '../recurrence';
 import type { CalendarEvent, Expense, Habit, Reminder, Task, View } from '../types';
 import { formatMoney, formatTime, todayStr } from '../utils';
@@ -122,7 +129,9 @@ export default function Dashboard({
                         onChange={() =>
                           setTasks((prev) =>
                             prev.map((t) =>
-                              `t-${t.id}` === item.id ? { ...t, done: true } : t,
+                              `t-${t.id}` === item.id
+                                ? { ...t, done: true, doneAt: Date.now() }
+                                : t,
                             ),
                           )
                         }
@@ -178,6 +187,13 @@ export default function Dashboard({
               </div>
             </>
           )}
+        </section>
+
+        <section className="card clickable" onClick={() => onNavigate('review')}>
+          <h2>
+            <ClipboardList size={15} strokeWidth={1.5} /> Weekly review
+          </h2>
+          <p className="muted">How the week went, and what's ahead.</p>
         </section>
 
         <section className="card clickable" onClick={() => onNavigate('budget')}>
