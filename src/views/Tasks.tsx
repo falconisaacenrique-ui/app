@@ -19,6 +19,7 @@ interface Props {
 const PRIORITY_ORDER: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
 const PRIORITIES = ['medium', 'high', 'low'] as const;
 const REPEATS = ['', 'daily', 'weekly', 'monthly'] as const;
+const DURATIONS = ['30', '15', '45', '60', '90'] as const;
 
 function repeatLabel(r: '' | Repeat): string {
   return REPEAT_LABELS.find((x) => x.value === r)?.label ?? 'Once';
@@ -29,6 +30,7 @@ function SmartAddTask({ onAdd }: { onAdd: (t: Omit<Task, 'id' | 'createdAt'>) =>
   const [text, setText] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [repeat, setRepeat] = useState<'' | Repeat>('');
+  const [duration, setDuration] = useState<(typeof DURATIONS)[number]>('30');
   const [due, setDue] = useState('');
   const [showDate, setShowDate] = useState(false);
 
@@ -41,7 +43,8 @@ function SmartAddTask({ onAdd }: { onAdd: (t: Omit<Task, 'id' | 'createdAt'>) =>
       done: false,
       due: due || parsed.date || undefined,
       priority,
-      repeat: repeat || undefined,
+      repeat: repeat || parsed.repeat || undefined,
+      duration: Number(duration),
     });
     setText('');
     setDue('');
@@ -98,9 +101,17 @@ function SmartAddTask({ onAdd }: { onAdd: (t: Omit<Task, 'id' | 'createdAt'>) =>
           active={repeat !== ''}
           onChange={setRepeat}
         />
+        <CycleChip
+          value={duration}
+          options={DURATIONS}
+          format={(d) => `${d} min`}
+          label="Duration (for the planner)"
+          active={duration !== '30'}
+          onChange={setDuration}
+        />
       </div>
       <p className="hint muted small">
-        Tip: type a day right in the text — <em>buy groceries friday</em>
+        Tip: type it naturally — <em>buy groceries friday</em>, <em>gym every monday</em>
       </p>
     </form>
   );

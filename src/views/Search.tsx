@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Bell,
   Calendar as CalendarIcon,
@@ -6,6 +6,7 @@ import {
   StickyNote,
   Wallet,
 } from 'lucide-react';
+import { SearchIndex } from '../searchengine';
 import type { CalendarEvent, Expense, Note, Reminder, Task, View } from '../types';
 import { formatDate, formatDateTime, formatMoney } from '../utils';
 
@@ -37,60 +38,64 @@ export default function Search({
   onNavigate,
 }: Props) {
   const [query, setQuery] = useState('');
-  const q = query.trim().toLowerCase();
+  const q = query.trim();
 
-  const matches = (...fields: (string | undefined)[]) =>
-    fields.some((f) => f?.toLowerCase().includes(q));
+  // Inverted index with TF-IDF ranking and trigram fuzzy matching — typos welcome.
+  const { index, byId } = useMemo(() => {
+    const all: Result[] = [
+      ...notes.map((n) => ({
+        id: `n-${n.id}`,
+        view: 'notes' as View,
+        icon: StickyNote,
+        label: n.title || 'Untitled',
+        detail: n.content.slice(0, 80),
+        text: `${n.title} ${n.content}`,
+      })),
+      ...tasks.map((t) => ({
+        id: `t-${t.id}`,
+        view: 'tasks' as View,
+        icon: CheckSquare,
+        label: t.text,
+        detail: t.due ? formatDate(t.due) : undefined,
+        text: t.text,
+      })),
+      ...events.map((e) => ({
+        id: `e-${e.id}`,
+        view: 'calendar' as View,
+        icon: CalendarIcon,
+        label: e.title,
+        detail: formatDate(e.date),
+        text: `${e.title} ${e.notes ?? ''}`,
+      })),
+      ...reminders.map((r) => ({
+        id: `r-${r.id}`,
+        view: 'reminders' as View,
+        icon: Bell,
+        label: r.text,
+        detail: formatDateTime(r.datetime),
+        text: r.text,
+      })),
+      ...expenses.map((e) => ({
+        id: `x-${e.id}`,
+        view: 'budget' as View,
+        icon: Wallet,
+        label: e.description,
+        detail: `${formatMoney(e.amount, currency)} · ${formatDate(e.date)}`,
+        text: `${e.description} ${e.category}`,
+      })),
+    ];
+    return {
+      index: new SearchIndex(all.map((r) => ({ id: r.id, text: (r as Result & { text: string }).text }))),
+      byId: new Map(all.map((r) => [r.id, r])),
+    };
+  }, [notes, tasks, events, reminders, expenses, currency]);
 
   const results: Result[] = !q
     ? []
-    : [
-        ...notes
-          .filter((n) => matches(n.title, n.content))
-          .map((n) => ({
-            id: `n-${n.id}`,
-            view: 'notes' as View,
-            icon: StickyNote,
-            label: n.title || 'Untitled',
-            detail: n.content.slice(0, 80),
-          })),
-        ...tasks
-          .filter((t) => matches(t.text))
-          .map((t) => ({
-            id: `t-${t.id}`,
-            view: 'tasks' as View,
-            icon: CheckSquare,
-            label: t.text,
-            detail: t.due ? formatDate(t.due) : undefined,
-          })),
-        ...events
-          .filter((e) => matches(e.title, e.notes))
-          .map((e) => ({
-            id: `e-${e.id}`,
-            view: 'calendar' as View,
-            icon: CalendarIcon,
-            label: e.title,
-            detail: formatDate(e.date),
-          })),
-        ...reminders
-          .filter((r) => matches(r.text))
-          .map((r) => ({
-            id: `r-${r.id}`,
-            view: 'reminders' as View,
-            icon: Bell,
-            label: r.text,
-            detail: formatDateTime(r.datetime),
-          })),
-        ...expenses
-          .filter((e) => matches(e.description, e.category))
-          .map((e) => ({
-            id: `x-${e.id}`,
-            view: 'budget' as View,
-            icon: Wallet,
-            label: e.description,
-            detail: `${formatMoney(e.amount, currency)} · ${formatDate(e.date)}`,
-          })),
-      ];
+    : index
+        .search(q)
+        .map((hit) => byId.get(hit.id))
+        .filter((r): r is Result => r !== undefined);
 
   return (
     <div className="view">

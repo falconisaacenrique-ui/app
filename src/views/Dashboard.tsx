@@ -1,16 +1,24 @@
+import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   Calendar as CalendarIcon,
   CheckSquare,
   ClipboardList,
+  Clock,
   Flame,
+  Pause,
+  Play,
   Plus,
   Wallet,
   X,
 } from 'lucide-react';
 import Check from '../components/Check';
+import CycleChip from '../components/CycleChip';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { occursOn } from '../recurrence';
+import { startSound, stopSound, type SoundKind } from '../audio';
+import { minutesToHM } from '../solver';
+import type { StoredPlan } from './Plan';
 import type { CalendarEvent, Expense, Habit, Reminder, Task, View } from '../types';
 import { formatMoney, formatTime, todayStr } from '../utils';
 
@@ -25,14 +33,97 @@ interface Props {
   currency: string;
   onNavigate: (view: View) => void;
   onQuickAdd: () => void;
+  showToast: (message: string) => void;
 }
 
 interface TimelineItem {
   id: string;
-  kind: 'event' | 'task' | 'reminder';
+  kind: 'event' | 'task' | 'reminder' | 'plan';
   time?: string; // HH:MM, undefined = all-day
   label: string;
   overdue?: boolean;
+}
+
+const FOCUS_MINUTES = ['25', '15', '45', '60'] as const;
+const SOUNDS = ['off', 'rain', 'wind', 'deep'] as const;
+
+/** Focus timer with procedurally synthesized soundscapes (Web Audio). */
+function FocusCard({ showToast }: { showToast: (m: string) => void }) {
+  const [minutes, setMinutes] = useState<(typeof FOCUS_MINUTES)[number]>('25');
+  const [sound, setSound] = useState<(typeof SOUNDS)[number]>('off');
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopTimer() {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+    stopSound();
+  }
+
+  function start() {
+    stopTimer();
+    setRemaining(Number(minutes) * 60);
+    if (sound !== 'off') startSound(sound as SoundKind);
+    timer.current = setInterval(() => {
+      setRemaining((r) => {
+        if (r === null) return r;
+        if (r <= 1) {
+          stopTimer();
+          showToast('Focus session complete.');
+          return null;
+        }
+        return r - 1;
+      });
+    }, 1000);
+  }
+
+  function pause() {
+    stopTimer();
+    setRemaining(null);
+  }
+
+  useEffect(() => () => stopTimer(), []);
+
+  return (
+    <section className="card">
+      <h2>
+        <Clock size={15} strokeWidth={1.5} /> Focus
+      </h2>
+      {remaining === null ? (
+        <div className="chip-row">
+          <CycleChip
+            value={minutes}
+            options={FOCUS_MINUTES}
+            format={(m) => `${m} min`}
+            label="Session length"
+            onChange={setMinutes}
+          />
+          <CycleChip
+            value={sound}
+            options={SOUNDS}
+            format={(s) => (s === 'off' ? 'No sound' : s)}
+            label="Soundscape"
+            active={sound !== 'off'}
+            onChange={(s) => {
+              setSound(s);
+            }}
+          />
+          <button className="chip row" onClick={start}>
+            <Play size={13} strokeWidth={1.5} /> Start
+          </button>
+        </div>
+      ) : (
+        <div className="row">
+          <span className="big-number grow">
+            {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+          </span>
+          <button className="chip row" onClick={pause}>
+            <Pause size={13} strokeWidth={1.5} /> Stop
+          </button>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function greeting(): string {
@@ -54,9 +145,11 @@ export default function Dashboard({
   currency,
   onNavigate,
   onQuickAdd,
+  showToast,
 }: Props) {
   const today = todayStr();
   const [welcomed, setWelcomed] = useLocalStorage<boolean>('lifehub.welcomed', false);
+  const [plan] = useLocalStorage<StoredPlan | null>('lifehub.plan', null);
 
   const hasAnyData =
     events.length > 0 ||
@@ -91,6 +184,18 @@ export default function Dashboard({
         label: t.text,
         overdue: t.due! < today,
       })),
+    ...(plan?.blocks ?? [])
+      .filter(
+        (b) =>
+          b.date === today &&
+          tasks.some((t) => t.id === b.taskId && !t.done && (!t.due || t.due > today)),
+      )
+      .map((b) => ({
+        id: `p-${b.taskId}-${b.start}`,
+        kind: 'plan' as const,
+        time: minutesToHM(b.start),
+        label: `${b.text} (planned)`,
+      })),
   ].sort((a, b) => (a.time ?? '00:00').localeCompare(b.time ?? '00:00'));
 
   const openTasks = tasks.filter((t) => !t.done);
@@ -102,11 +207,12 @@ export default function Dashboard({
     .filter((e) => e.date.startsWith(month))
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const KIND_ICON = { event: CalendarIcon, reminder: Bell, task: CheckSquare };
+  const KIND_ICON = { event: CalendarIcon, reminder: Bell, task: CheckSquare, plan: Clock };
   const KIND_VIEW: Record<TimelineItem['kind'], View> = {
     event: 'calendar',
     reminder: 'reminders',
     task: 'tasks',
+    plan: 'plan',
   };
 
   const taskSummary =
@@ -215,6 +321,8 @@ export default function Dashboard({
           </ul>
         )}
       </section>
+
+      <FocusCard showToast={showToast} />
 
       <div className="dash-grid">
         <section className="card clickable" onClick={() => onNavigate('tasks')}>

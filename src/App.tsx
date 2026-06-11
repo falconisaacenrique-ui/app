@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  BarChart3,
   Bell,
   Calendar as CalendarIcon,
+  CalendarRange,
   CheckSquare,
   ClipboardList,
   Flame,
+  GraduationCap,
+  History as HistoryIcon,
   LayoutDashboard,
   MoreHorizontal,
   Plus,
   Search as SearchIcon,
   Settings as SettingsIcon,
+  Sprout,
   StickyNote,
   Wallet,
   X,
@@ -17,7 +22,15 @@ import {
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { nextDatetime } from './recurrence';
 import { parseQuickAdd } from './quickadd';
-import { todayStr, uid } from './utils';
+import { fireRules, parseRules } from './dsl';
+import {
+  diffCollections,
+  JOURNAL_CAP,
+  type EntityKind,
+  type JournalEvent,
+} from './journal';
+import type { Fact } from './sm2';
+import { streak, todayStr, uid } from './utils';
 import type {
   CalendarEvent,
   Expense,
@@ -38,6 +51,11 @@ import Budget from './views/Budget';
 import SearchView from './views/Search';
 import SettingsView from './views/Settings';
 import Review from './views/Review';
+import PlanView from './views/Plan';
+import Insights from './views/Insights';
+import Garden from './views/Garden';
+import Remember from './views/Remember';
+import History from './views/History';
 
 interface NavItem {
   view: View;
@@ -53,10 +71,15 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const MORE_NAV: NavItem[] = [
+  { view: 'plan', label: 'Plan', icon: CalendarRange },
+  { view: 'insights', label: 'Insights', icon: BarChart3 },
+  { view: 'garden', label: 'Garden', icon: Sprout },
   { view: 'notes', label: 'Notes', icon: StickyNote },
   { view: 'reminders', label: 'Reminders', icon: Bell },
   { view: 'budget', label: 'Budget', icon: Wallet },
+  { view: 'remember', label: 'Remember', icon: GraduationCap },
   { view: 'review', label: 'Weekly review', icon: ClipboardList },
+  { view: 'history', label: 'History', icon: HistoryIcon },
   { view: 'search', label: 'Search', icon: SearchIcon },
   { view: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
@@ -73,6 +96,11 @@ const SHORTCUT_VIEWS: Record<string, View> = {
   b: 'budget',
   w: 'review',
   s: 'settings',
+  p: 'plan',
+  i: 'insights',
+  g: 'garden',
+  m: 'remember',
+  y: 'history',
 };
 
 function viewFromHash(): View {
@@ -113,6 +141,10 @@ export default function App() {
   const [habits, setHabits] = useLocalStorage<Habit[]>('lifehub.habits', []);
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('lifehub.expenses', []);
   const [budget, setBudget] = useLocalStorage<number>('lifehub.budget', 0);
+  const [facts, setFacts] = useLocalStorage<Fact[]>('lifehub.facts', []);
+  const [journal, setJournal] = useLocalStorage<JournalEvent[]>('lifehub.journal', []);
+  const [rulesText, setRulesText] = useLocalStorage<string>('lifehub.rules', '');
+  const [ruleFires, setRuleFires] = useLocalStorage<Record<string, string>>('lifehub.ruleFires', {});
   const [settings, setSettings] = useLocalStorage<Settings>('lifehub.settings', {
     currency: 'USD',
   });
@@ -157,6 +189,103 @@ export default function App() {
     (message: string, undo: () => void) => showToast(message, undo),
     [showToast],
   );
+
+  // The Time Machine: journal every change by diffing collections.
+  const prevCollections = useRef<{
+    task: Task[];
+    event: CalendarEvent[];
+    note: Note[];
+    reminder: Reminder[];
+    habit: Habit[];
+    expense: Expense[];
+    fact: Fact[];
+  } | null>(null);
+  useEffect(() => {
+    const current = {
+      task: tasks,
+      event: events,
+      note: notes,
+      reminder: reminders,
+      habit: habits,
+      expense: expenses,
+      fact: facts,
+    };
+    const prev = prevCollections.current;
+    prevCollections.current = current;
+    if (!prev) return;
+    const ts = Date.now();
+    const changes: JournalEvent[] = [
+      ...diffCollections('task', prev.task, tasks, (t) => t.text, ts),
+      ...diffCollections('event', prev.event, events, (e) => e.title, ts),
+      ...diffCollections('note', prev.note, notes, (n) => n.title || 'Untitled', ts),
+      ...diffCollections('reminder', prev.reminder, reminders, (r) => r.text, ts),
+      ...diffCollections('habit', prev.habit, habits, (h) => h.name, ts),
+      ...diffCollections('expense', prev.expense, expenses, (e) => e.description, ts),
+      ...diffCollections('fact', prev.fact, facts, (f) => f.front, ts),
+    ];
+    if (changes.length > 0) {
+      setJournal((j) => [...j, ...changes].slice(-JOURNAL_CAP));
+    }
+  }, [tasks, events, notes, reminders, habits, expenses, facts, setJournal]);
+
+  // The rules engine: user-written rules fire at most once per rule per day.
+  useEffect(() => {
+    const { rules } = parseRules(rulesText);
+    if (rules.length === 0) return;
+    const today = todayStr();
+    const month = today.slice(0, 7);
+    const ctx = {
+      habitStreak: (name: string) => {
+        const habit = habits.find((h) => h.name.toLowerCase() === name.toLowerCase());
+        return habit ? streak(habit.doneDates) : 0;
+      },
+      tasksOverdue: tasks.filter((t) => !t.done && t.due && t.due < today).length,
+      spentThisMonth: expenses
+        .filter((e) => e.date.startsWith(month))
+        .reduce((s, e) => s + e.amount, 0),
+      allHabitsDoneToday:
+        habits.length > 0 && habits.every((h) => h.doneDates.includes(today)),
+    };
+    const fired = fireRules(rules, ctx).filter((r) => ruleFires[r.source] !== today);
+    if (fired.length === 0) return;
+    // Defer the mutations so the effect itself never sets state synchronously.
+    const timer = setTimeout(() => {
+      applyFired();
+    }, 0);
+    function applyFired() {
+      for (const rule of fired) {
+      const { action } = rule;
+      if (action.type === 'task') {
+        setTasks((prev) => [
+          ...prev,
+          { id: uid(), text: action.text, done: false, priority: 'medium', createdAt: Date.now() },
+        ]);
+      } else if (action.type === 'note') {
+        setNotes((prev) => [
+          { id: uid(), title: action.text, content: '', updatedAt: Date.now(), pinned: false },
+          ...prev,
+        ]);
+      } else {
+        setReminders((prev) => [
+          ...prev,
+          {
+            id: uid(),
+            text: action.text,
+            datetime: `${today}T20:00`,
+            done: false,
+            notified: false,
+          },
+        ]);
+      }
+      }
+      setRuleFires((prev) => ({
+        ...prev,
+        ...Object.fromEntries(fired.map((r) => [r.source, today])),
+      }));
+      showToast(`Rule fired: ${fired[0].action.type} "${fired[0].action.text}"`);
+    }
+    return () => clearTimeout(timer);
+  }, [rulesText, habits, tasks, expenses, ruleFires, setRuleFires, setTasks, setNotes, setReminders, showToast]);
 
   // Global keyboard shortcuts: n = quick add, / = search, g+letter = go to view.
   useEffect(() => {
@@ -242,6 +371,7 @@ export default function App() {
           datetime: `${parsed.date}T${parsed.time}`,
           done: false,
           notified: false,
+          repeat: parsed.repeat,
         },
       ]);
       setView('reminders');
@@ -255,6 +385,7 @@ export default function App() {
           date: parsed.date ?? todayStr(),
           time: parsed.time,
           color: '#4f46e5',
+          repeat: parsed.repeat,
         },
       ]);
       setView('calendar');
@@ -269,6 +400,7 @@ export default function App() {
           due: parsed.date,
           priority: 'medium',
           createdAt: Date.now(),
+          repeat: parsed.repeat,
         },
       ]);
       setView('tasks');
@@ -276,6 +408,17 @@ export default function App() {
     }
     setQuickAddText('');
     setQuickAddOpen(false);
+  }
+
+  function restoreFromHistory(entity: EntityKind, item: unknown) {
+    if (entity === 'task') setTasks((prev) => [...prev, item as Task]);
+    else if (entity === 'event') setEvents((prev) => [...prev, item as CalendarEvent]);
+    else if (entity === 'note') setNotes((prev) => [item as Note, ...prev]);
+    else if (entity === 'reminder') setReminders((prev) => [...prev, item as Reminder]);
+    else if (entity === 'habit') setHabits((prev) => [...prev, item as Habit]);
+    else if (entity === 'expense') setExpenses((prev) => [...prev, item as Expense]);
+    else if (entity === 'fact') setFacts((prev) => [...prev, item as Fact]);
+    showToast('Restored.');
   }
 
   const navButton = ({ view: v, label, icon: Icon }: NavItem) => (
@@ -291,6 +434,11 @@ export default function App() {
   );
 
   const moreActive = MORE_NAV.some((n) => n.view === view);
+  const today = todayStr();
+  const month = today.slice(0, 7);
+  const overBudget =
+    budget > 0 &&
+    expenses.filter((e) => e.date.startsWith(month)).reduce((s, e) => s + e.amount, 0) > budget;
 
   return (
     <div className="app">
@@ -343,6 +491,7 @@ export default function App() {
             currency={settings.currency}
             onNavigate={setView}
             onQuickAdd={() => setQuickAddOpen(true)}
+            showToast={showToast}
           />
         )}
         {view === 'calendar' && (
@@ -379,7 +528,14 @@ export default function App() {
             onNavigate={setView}
           />
         )}
-        {view === 'settings' && <SettingsView settings={settings} setSettings={setSettings} />}
+        {view === 'settings' && (
+          <SettingsView
+            settings={settings}
+            setSettings={setSettings}
+            rulesText={rulesText}
+            setRulesText={setRulesText}
+          />
+        )}
         {view === 'review' && (
           <Review
             events={events}
@@ -389,6 +545,34 @@ export default function App() {
             expenses={expenses}
             budget={budget}
             currency={settings.currency}
+          />
+        )}
+        {view === 'plan' && <PlanView tasks={tasks} events={events} />}
+        {view === 'insights' && (
+          <Insights
+            tasks={tasks}
+            habits={habits}
+            expenses={expenses}
+            budget={budget}
+            currency={settings.currency}
+          />
+        )}
+        {view === 'garden' && <Garden habits={habits} tasks={tasks} overBudget={overBudget} />}
+        {view === 'remember' && (
+          <Remember facts={facts} setFacts={setFacts} showUndo={showUndo} />
+        )}
+        {view === 'history' && (
+          <History
+            journal={journal}
+            collections={{
+              task: tasks,
+              event: events,
+              note: notes,
+              reminder: reminders,
+              habit: habits,
+              expense: expenses,
+            }}
+            onRestore={restoreFromHistory}
           />
         )}
       </main>
@@ -418,8 +602,8 @@ export default function App() {
               </button>
             </div>
             <p className="muted small">
-              Try <em>dentist tomorrow 3pm</em> · <em>remind me to call mom 9am</em> ·{' '}
-              <em>buy groceries friday</em>
+              Try <em>dentist tomorrow 3pm</em> · <em>gym every monday</em> ·{' '}
+              <em>remind me to call mom 9am</em>
             </p>
             <button type="submit" className="primary">
               Add

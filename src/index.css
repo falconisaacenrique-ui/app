@@ -1318,3 +1318,80 @@ kbd {
     width: 5.2rem;
   }
 }
+
+/* ---- Insights ---- */
+.hour-chart {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 56px;
+  margin-top: 0.6rem;
+}
+
+.hour-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.hour-bar {
+  width: 100%;
+  background: var(--accent);
+  opacity: 0.75;
+  border-radius: 2px 2px 0 0;
+}
+
+/* ---- Garden ---- */
+.garden-card canvas {
+  display: block;
+  width: 100%;
+}
+
+/* ---- History scrubber ---- */
+.scrubber {
+  width: 100%;
+  accent-color: var(--accent);
+  direction: rtl; /* drag left = back in time */
+  margin: 0.4rem 0 0.6rem;
+}
+
+/* ---- Remember ---- */
+.recall-card {
+  border-color: var(--accent);
+}
+
+.recall-front {
+  font-size: 1.15rem;
+  margin: 0.4rem 0;
+}
+
+.recall-back {
+  color: var(--accent);
+  margin: 0.2rem 0 0.8rem;
+}
+
+/* ---- Rules & sync ---- */
+.rules-editor,
+.sync-code {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 0.6rem 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+  margin: 0.4rem 0;
+}
+
+.rules-editor:focus,
+.sync-code:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sync-code[readonly] {
+  color: var(--muted);
+  word-break: break-all;
+}

@@ -12,6 +12,7 @@ export interface ParsedQuickAdd {
   text: string;
   date?: string; // YYYY-MM-DD
   time?: string; // HH:MM
+  repeat?: 'daily' | 'weekly' | 'monthly';
 }
 
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -27,6 +28,29 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
   if (reminderMatch) {
     kind = 'reminder';
     text = text.slice(reminderMatch[0].length);
+  }
+
+  // Recurrence: "every day", "every week/month", "every monday"
+  let repeat: ParsedQuickAdd['repeat'];
+  const everyMatch = text.match(
+    /\bevery\s+(day|morning|week|month|sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)\b/i,
+  );
+  if (everyMatch) {
+    const unit = everyMatch[1].toLowerCase();
+    if (unit === 'day' || unit === 'morning') repeat = 'daily';
+    else if (unit === 'week') repeat = 'weekly';
+    else if (unit === 'month') repeat = 'monthly';
+    else {
+      repeat = 'weekly';
+      const idx = WEEKDAYS.findIndex((w) => w === unit || w.slice(0, 3) === unit);
+      if (idx >= 0) {
+        const d = new Date(now);
+        const delta = (idx - d.getDay() + 7) % 7; // next occurrence, today allowed
+        d.setDate(d.getDate() + delta);
+        date = toDateStr(d);
+      }
+    }
+    text = (text.slice(0, everyMatch.index) + text.slice(everyMatch.index! + everyMatch[0].length)).trim();
   }
 
   // Time: "3pm", "3:30 pm", "15:00", "at 9"
@@ -102,8 +126,9 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
     if (!date) date = toDateStr(now);
   }
 
+  if (repeat && !date) date = toDateStr(now);
   text = text.replace(/\s{2,}/g, ' ').replace(/\s+(at|on)$/i, '').trim();
-  return { kind, text, date, time };
+  return { kind, text, date, time, repeat };
 }
 
 /** "Coffee 4.50" -> { description: "Coffee", amount: 4.5 }. */

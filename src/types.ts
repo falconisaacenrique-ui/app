@@ -38,6 +38,7 @@ export interface Task {
   createdAt: number;
   doneAt?: number; // when the task was completed
   repeat?: Repeat; // completing a repeating task advances its due date
+  duration?: number; // minutes, used by the planner (default 30)
 }
 
 export interface Habit {
@@ -71,4 +72,9 @@ export type View =
   | 'budget'
   | 'search'
   | 'settings'
-  | 'review';
+  | 'review'
+  | 'plan'
+  | 'insights'
+  | 'garden'
+  | 'remember'
+  | 'history';

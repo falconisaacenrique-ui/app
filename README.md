@@ -29,6 +29,23 @@ See [GOAL.md](GOAL.md) — the full product goal this app implements.
 - **Backup & transfer** — export/import all data as JSON, or as a password-encrypted
   (AES-GCM) file safe to move between devices through any channel; storage
   persistence is requested so the browser protects your data.
+- **Plan** — a simulated-annealing solver schedules open tasks into the free gaps
+  of your next 7 days, around events, before deadlines, in your productive hours.
+- **Insights** — on-device statistics: a logistic-regression "completion prophecy"
+  for tasks, Monte Carlo month-end spending forecasts, your circadian power hours,
+  and cross-life correlations. No data ever leaves the browser.
+- **Garden** — a procedurally generated L-system garden grown from your real data:
+  habits are plants, streaks make them flower, tasks build the fence, the budget
+  sets the weather.
+- **Remember** — spaced repetition (SM-2) for anything worth keeping.
+- **Rules** — a tiny built-in language: `when habit "gym" streak >= 7 then add task
+  "buy protein"`, checked daily.
+- **History** — every change journaled; scrub back through time and restore
+  anything ever deleted.
+- **Device sync** — serverless: devices connect directly over WebRTC with manual
+  pairing codes and merge via last-writer-wins with deletion tombstones.
+- **Focus** — a timer with procedurally synthesized soundscapes (rain, wind, deep
+  noise) via the Web Audio API.
 - **PWA** — installable, offline-capable, hash-routed so the back button works.
 
 ## Design
